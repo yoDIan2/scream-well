@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>尖叫之井 · M0-a 手感对比原型</title>
+<link rel="stylesheet" href="./style.css?v=m4d">
+</head>
+<body>
+<div id="proto-bar">
+  <span id="proto-tag">m4d</span>
+  <button type="button" class="xb" id="btn-x1">3血</button>
+  <button type="button" class="xb" id="btn-x2">2血</button>
+  <button type="button" class="xb" id="btn-x3">1血</button>
+  <button type="button" id="btn-restart">重开</button>
+  <button type="button" id="btn-jump">下跳10层</button>
+  <button type="button" id="btn-flood">山洪</button>
+  <button type="button" id="btn-debug">调试</button>
+  <button type="button" id="btn-audio">音频:开</button>
+  <button type="button" id="btn-t-magnet">磁吸</button>
+  <button type="button" id="btn-t-hard">硬着陆</button>
+  <button type="button" id="btn-t-fish">拦路蛛</button>
+</div>
+<div id="stage">
+  <canvas id="cv"></canvas>
+</div>
+<div id="result" class="hidden">
+  <div id="result-card">
+    <div id="result-title">被水冲回井口了</div>
+    <div id="result-depth">第 1 层</div>
+    <div id="result-meta"></div>
+    <div id="result-xbtns">
+      <button type="button" class="xb" id="rx1">3血</button>
+      <button type="button" class="xb" id="rx2">2血</button>
+      <button type="button" class="xb" id="rx3">1血</button>
+    </div>
+    <button type="button" id="btn-again">再来一局</button>
+    <img id="report-img" class="hidden" alt="战报">
+    <div id="share-btns" class="hidden">
+      <button type="button" id="btn-album">存相册</button>
+      <button type="button" id="btn-note">发笔记</button>
+    </div>
+    <div id="share-status"></div>
+    <div id="result-hint">同一个 seed，三口井一模一样，只有横向控制不同</div>
+  </div>
+</div>
+<div id="pick3" class="hidden">
+  <div id="pick3-card">
+    <div id="pick3-title">坝缝里捡到点什么？</div>
+    <button type="button" class="p3" id="p3-0"></button>
+    <button type="button" class="p3" id="p3-1"></button>
+    <button type="button" class="p3" id="p3-2"></button>
+    <div id="pick3-hint">点一张带走 · 每 10 层一次</div>
+  </div>
+</div>
+<script src="./game.js?v=m4d"></script>
+</body>
+</html>
