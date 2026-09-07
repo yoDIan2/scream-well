@@ -297,7 +297,7 @@
   }
 
   /* ===================== 状态 ===================== */
-  var VER = 'm4d';
+  var VER = 'm4e';
   var S = null;
   var P = null;
   var gTier = 3;   // 血量档：1=3血(新手) 2=2血(标准) 3=1血(进阶)；本版默认 1 血交付手感
@@ -436,7 +436,7 @@
 
     /* 关底层（25/50/75）：看天蛙独占，血量随关递增 */
     if (n === 25 || n === 50 || n === 75) {
-      var fhp = 6 + n / 25 + atkLevels() * 5;   // 温和水涨船高：攻击构筑越强，关底越抗打
+      var fhp = (n === 25 ? 9 : (n === 50 ? 15 : 22)) + Math.min(8, atkLevels() * 2);   // m4e：重定基+温和缩放，满弹匣必须打得死
       f.frog = { y: top + 640, hp: fhp, maxHp: fhp, alive: true, open: true, t: 0, openness: 1, mouthW: 170, hitT: -9 };
       f.stones = [];
       f.pickups.push(mkPickup(top + 300, rnd, 'jar'));
@@ -785,6 +785,11 @@
           }
         }
         fg.openness += ((fg.open ? 1 : 0) - fg.openness) * Math.min(1, 9 * dt);
+        /* m4e 防死锁：弹尽且蛙活着时，蛙上方掉一袋（换层救济在蛙层到不了手） */
+        if (P.ammo <= 6 && !f.frogRescued) {
+          f.frogRescued = true;
+          f.pickups.push(mkPickup(fg.y - 520, mulberry32(hashStr(S.seedKey + '#fr' + f.n)), 'bag'));
+        }
         /* 蛙背是平台 */
         if (P.vy >= 0 && prevBottom <= fg.y - 6 && P.y + P.r >= fg.y - 8) {
           P.y = fg.y - 8 - P.r;
@@ -971,6 +976,14 @@
           }
           continue;
         }
+      } else if (bf.frog && bf.frog.alive &&
+          Math.abs(bu.y - frogMouthY(bf.frog.y)) < 34 &&
+          Math.abs(bu.x - shaftCx(bf.frog.y)) < bf.frog.mouthW * 0.5) {
+        /* m4e：闭嘴挡弹——浪费要看得见，才教得出节奏 */
+        bu.live = false;
+        burst(bu.x, bu.y, 2, '#cfd6e2', 70);
+        floatText(bu.x, bu.y - 10, '闭嘴', '#cfd6e2');
+        continue;
       }
       if (bf.fish && bf.fish.alive) {
         var fdx = bu.x - bf.fish.x, fdy = bu.y - bf.fish.y;
