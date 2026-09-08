@@ -232,6 +232,10 @@
   var resBtns = [document.getElementById('rx1'), document.getElementById('rx2'), document.getElementById('rx3')];
   var togBtns = [document.getElementById('btn-t-magnet'), document.getElementById('btn-t-hard'), document.getElementById('btn-t-fish')];
   var elPick3 = document.getElementById('pick3');
+  var elHome = document.getElementById('home');
+  var htBtns = [document.getElementById('ht1'), document.getElementById('ht2'), document.getElementById('ht3')];
+  var elHomeStat = document.getElementById('home-stat');
+  var elMute = document.getElementById('btn-mute');
   var p3Btns = [document.getElementById('p3-0'), document.getElementById('p3-1'), document.getElementById('p3-2')];
   var elReportImg = document.getElementById('report-img');
   var elShareBtns = document.getElementById('share-btns');
@@ -317,11 +321,12 @@
   }
 
   /* ===================== 状态 ===================== */
-  var VER = 'm4g';
+  var VER = 'm4i';
   var S = null;
   var P = null;
   var gTier = 3;   // 血量档：1=3血(新手) 2=2血(标准) 3=1血(进阶)；本版默认 1 血交付手感
   var gDebug = false;
+  var gAttract = true;   // 首页期间：井画着但物理不推进（潭水钟也不走）
   var fps = 60, fpsAcc = 0, fpsN = 0;
 
   function todayKey() {
@@ -1427,7 +1432,7 @@
     ctx.fillStyle = vg;
     ctx.fillRect(0, 0, CFG.LOGICAL_W, VIEW.h);
 
-    drawHud();
+    if (!gAttract) drawHud();
     if (S.flashT > 0) {
       ctx.fillStyle = 'rgba(255,255,255,' + (S.flashT / 0.15 * 0.2).toFixed(3) + ')';
       ctx.fillRect(0, 0, CFG.LOGICAL_W, VIEW.h);
@@ -2143,6 +2148,7 @@
     for (var i = 0; i < 3; i++) {
       barBtns[i].className = 'xb' + (gTier === i + 1 ? ' on' : '');
       resBtns[i].className = 'xb' + (gTier === i + 1 ? ' on' : '');
+      htBtns[i].className = 'ht' + (gTier === i + 1 ? ' on' : '');
     }
   }
 
@@ -2230,7 +2236,7 @@
   document.getElementById('btn-jump').addEventListener('click', function () { jumpFloors(10); });
   document.getElementById('btn-flood').addEventListener('click', function () { if (!S.waterOn) triggerFlood(); });
   document.getElementById('btn-debug').addEventListener('click', function () { gDebug = !gDebug; });
-  document.getElementById('btn-audio').addEventListener('click', function () {
+  function toggleAudio() {
     AU.on = !AU.on;
     if (!AU.on) {
       if (AU.master && AU.ctx) AU.master.gain.setTargetAtTime(0, AU.ctx.currentTime, 0.02);
@@ -2238,8 +2244,11 @@
       audioUnlock();
       if (AU.master && AU.ctx) AU.master.gain.setTargetAtTime(0.5, AU.ctx.currentTime, 0.02);
     }
-    this.textContent = AU.on ? '音频:开' : '音频:静音';
-  });
+    var lab = AU.on ? '音频:开' : '音频:静音';
+    elMute.textContent = lab;
+    document.getElementById('btn-audio').textContent = lab;
+  }
+  document.getElementById('btn-audio').addEventListener('click', toggleAudio);
   window.addEventListener('touchend', audioUnlock, true);
   window.addEventListener('mouseup', audioUnlock, true);
   togBtns[0].addEventListener('click', function () { CFG.T_MAGNET = !CFG.T_MAGNET; syncToggleBtns(); });
@@ -2250,6 +2259,24 @@
   p3Btns[2].addEventListener('click', function () { if (S.pick3) applyPick(S.pick3.offers[2].id); });
   document.getElementById('btn-album').addEventListener('click', shareAlbum);
   document.getElementById('btn-note').addEventListener('click', shareNote);
+
+  /* ===================== 首页 ===================== */
+  function fillHome() {
+    var ctl = '一根手指：按住屏幕左／右侧就往那边走，同时往下吐籽';
+    elHomeStat.textContent = (gSave && gSave.totalRuns)
+      ? ctl + '\n今日井 第 ' + gSave.todayBest + ' 层 · 历史最深 第 ' + gSave.deepest + ' 层 · 累计下井 ' + gSave.totalRuns + ' 次'
+      : ctl;
+    document.getElementById('home-ver').textContent = 'v-' + VER;
+  }
+  for (var hi = 0; hi < 3; hi++) {
+    (function (el, m) { el.addEventListener('click', function () { setTier(m); }); })(htBtns[hi], hi + 1);
+  }
+  document.getElementById('btn-start').addEventListener('click', function () {
+    gAttract = false;
+    elHome.className = 'hidden';
+    newRun();
+  });
+  elMute.addEventListener('click', toggleAudio);
 
   window.addEventListener('resize', resize);
 
@@ -2709,6 +2736,7 @@
     fpsAcc += dt; fpsN++;
     if (fpsAcc >= 0.5) { fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; }
 
+    if (gAttract) { render(); return; }
     update(dt);
     render();
   }
@@ -2718,7 +2746,12 @@
   loadSave();
   loadImages();
   newRun();
+  fillHome();
+  syncTierBtns();
   document.getElementById('proto-tag').textContent = VER;
+  /* 顶部原型条只在 ?debug=1 时出现（重开/下跳/山洪/三原型开关都是开发工具） */
+  if (!gDebug) document.getElementById('proto-bar').className = 'hidden';
+  else { gAttract = false; elHome.className = 'hidden'; }   // 调试档：刷新即下井，不停首页
   syncToggleBtns();
   requestAnimationFrame(frame);
 

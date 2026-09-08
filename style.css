@@ -26,6 +26,8 @@ html, body {
   line-height: 1.4;
 }
 
+#proto-bar.hidden { display: none; }
+
 #proto-bar button {
   display: inline-block;
   margin: 2px 3px 2px 0;
@@ -80,17 +82,25 @@ html, body {
   z-index: 30;
   background: rgba(8, 9, 13, 0.5);
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 10px;
 }
 
 #result.hidden { display: none; }
 
+/* 卡片高度会随战报图/分享按钮变化 ⇒ 一律交给 flex 居中，不再硬编码自身半高 */
 #result-card {
-  position: absolute;
-  top: 50%;
-  left: 50%;
+  position: static;
+  box-sizing: border-box;
   width: 268px;
-  margin-left: -134px;
-  margin-top: -150px;
+  max-width: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: auto;
   padding: 18px 14px;
   border: 1px solid #3a4150;
   border-radius: 12px;
@@ -163,17 +173,24 @@ html, body {
   z-index: 25;
   background: rgba(8, 9, 13, 0.72);
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 10px;
 }
 
 #pick3.hidden { display: none; }
 
 #pick3-card {
-  position: absolute;
-  top: 50%;
-  left: 50%;
+  position: static;
+  box-sizing: border-box;
   width: 262px;
-  margin-left: -131px;
-  margin-top: -206px;
+  max-width: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: auto;
   padding: 16px 12px;
   border: 1px solid #3a4150;
   border-radius: 12px;
@@ -270,4 +287,143 @@ html, body {
   font-size: 11px;
   color: #9fe88a;
   min-height: 14px;
+}
+
+/* ===================== 首页：进游戏前的门面（身后的井静止渲染） ===================== */
+#home {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  box-sizing: border-box;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  text-align: center;
+  background: linear-gradient(180deg, rgba(8, 9, 13, 0.62) 0%, rgba(8, 9, 13, 0.9) 46%, rgba(6, 7, 10, 0.97) 100%);
+  padding: 34px 24px 18px;
+  padding-top: calc(34px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
+  padding-bottom: calc(18px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+}
+
+#home.hidden { display: none; }
+
+#home-kicker {
+  font-size: 11px;
+  letter-spacing: 4px;
+  color: #8e97a8;
+  margin-bottom: 12px;
+}
+
+#home-title {
+  font-size: 42px;
+  font-weight: 900;
+  letter-spacing: 8px;
+  color: #f2ead8;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.55);
+}
+
+#home-sub {
+  font-size: 13px;
+  letter-spacing: 2px;
+  color: #c9a06a;
+  margin-top: 8px;
+  margin-bottom: 20px;
+}
+
+#home-desc {
+  font-size: 12px;
+  line-height: 1.75;
+  color: #a9b2c2;
+  margin-bottom: 24px;
+}
+
+#home-tier {
+  max-width: 300px;
+  margin: 0 auto;
+}
+
+.ht {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 11px 14px;
+  margin-bottom: 8px;
+  border: 1px solid #3a4150;
+  border-radius: 10px;
+  background: #1a1d25;
+  text-align: left;
+  color: #cfd6e2;
+}
+
+.ht.on {
+  border-color: #e8b23a;
+  background: #241d0c;
+}
+
+.ht b {
+  display: inline-block;
+  width: 44px;
+  font-size: 15px;
+  font-weight: 800;
+  color: #f2ead8;
+}
+
+.ht.on b { color: #e8b23a; }
+
+.ht span {
+  font-size: 11px;
+  color: #8e97a8;
+}
+
+#btn-start {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 300px;
+  margin: 18px auto 0;
+  padding: 15px 0;
+  border: 0;
+  border-radius: 12px;
+  background: #d9534f;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: 8px;
+}
+
+#btn-start:active {
+  -webkit-transform: translateY(2px);
+  transform: translateY(2px);
+}
+
+#home-stat {
+  font-size: 11px;
+  line-height: 1.6;
+  color: #8e97a8;
+  margin-top: 16px;
+  white-space: pre-line;
+}
+
+#home-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 300px;
+  margin: 22px auto 0;
+}
+
+#home-ver {
+  font-size: 10px;
+  color: #5d6577;
+}
+
+#btn-mute {
+  padding: 4px 9px;
+  border: 1px solid #3a4150;
+  border-radius: 5px;
+  background: none;
+  color: #8e97a8;
+  font-size: 11px;
 }
