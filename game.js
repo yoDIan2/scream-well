@@ -49,6 +49,25 @@
     SPIKE_FROM: 25,
     SPIKE_RATE_TOP: 0.22,
     SPIKE_RATE_BOTTOM: 0.4,    // 壁刺率随深度线性上升（M4 第四刀回调：刺是标点不是主菜）
+    /* m4g D1 联合排位旋钮 */
+    SPIKE_Y_MIN: 320,          // 刺带 y0 在层内的取值窗口（层界附近留观察窗）
+    SPIKE_Y_MAX: 760,
+    SPIKE_Y_STEP: 40,
+    SPIKE_BAND_H: 180,         // 带高（原硬编码 180）
+    BAND_DAM_CLEAR: 70,        // 带与坝的最小垂直间距
+    GUARD_H_SPIDER: 67,        // 受击竖直半径 + 人半径：46 + 26*0.8 = 66.8
+    GUARD_H_BUG: 116,          // 72+34（全张光圈）+ 26*0.4
+    DAM_Y_MIN: 420,
+    DAM_Y_MAX: 1020,
+    DAM_Y_STEP: 40,
+    GUARD_BUG_OFF: 150,        // 虫咬着坝：钉在坝上方此距离
+    GUARD_SPIDER_OFF_LO: 300,
+    GUARD_SPIDER_OFF_HI: 500,
+    TENANT_FLOOR_MIN: 200,     // 层顶下方此深度以下才允许生实体
+    TENANT_Y_MIN: 260,
+    TENANT_Y_MAX: 1020,
+    TENANT_DAM_IN: 60,         // 住户不得生进坝体（含缓冲）
+    TENANT_DAM_FALL: 450,      // 住户生在大坝下方时的最小反应距离
     SPIKE_LEN_MIN: 70,
     SPIKE_LEN_MAX: 140,
     SPIKE_GAP_HALF: 88,       // 刺门缺口半宽（玩家直径 52+余量）
@@ -298,7 +317,7 @@
   }
 
   /* ===================== 状态 ===================== */
-  var VER = 'm4f';
+  var VER = 'm4g';
   var S = null;
   var P = null;
   var gTier = 3;   // 血量档：1=3血(新手) 2=2血(标准) 3=1血(进阶)；本版默认 1 血交付手感
@@ -407,6 +426,96 @@
     };
   }
 
+  /* ==== m4g D1：带 / 坝 / 守卫 联合排位 ====
+     带必须在坝上方：破坝那一瞬玩家没有反应距离再过一道门。
+     守卫与带必须垂直分离：串丝蛛全身巡游且身体半宽 ≥ 缺口可用余量，水平错开无效（见草案 §0）。
+     两趟扫描 + 计数选取：生成期零数组分配，分布不塌向窗口顶端。 */
+  function guardFits(by2, bc, need, guardTy, top) {
+    var y, lo, hi;
+    if (guardTy === 2) return Math.abs(by2 - CFG.GUARD_BUG_OFF - bc) >= need;
+    lo = Math.max(top + CFG.TENANT_FLOOR_MIN, by2 - CFG.GUARD_SPIDER_OFF_HI);
+    hi = by2 - CFG.GUARD_SPIDER_OFF_LO;
+    for (y = lo; y <= hi; y += CFG.SPIKE_Y_STEP) if (Math.abs(y - bc) >= need) return true;
+    return false;
+  }
+
+  function solveBandDam(top, byIn, guardTy, rnd) {
+    var out = { y0: -1, by: byIn, gy: -1 };
+    var hasDam = byIn > 0;
+    var bandHalf = CFG.SPIKE_BAND_H * 0.5 + CFG.PLAYER_R;
+    var need = guardTy ? bandHalf + (guardTy === 2 ? CFG.GUARD_H_BUG : CFG.GUARD_H_SPIDER) : 0;
+    var y0, by2, bc, cntY = 0, cntB = 0, ky, kb;
+    for (y0 = CFG.SPIKE_Y_MIN; y0 <= CFG.SPIKE_Y_MAX; y0 += CFG.SPIKE_Y_STEP) {
+      if (!hasDam) { cntY++; continue; }
+      bc = top + y0 + CFG.SPIKE_BAND_H * 0.5;
+      for (by2 = top + CFG.DAM_Y_MIN; by2 <= top + CFG.DAM_Y_MAX; by2 += CFG.DAM_Y_STEP) {
+        if (top + y0 + CFG.SPIKE_BAND_H + CFG.BAND_DAM_CLEAR > by2) continue;
+        if (need > 0 && !guardFits(by2, bc, need, guardTy, top)) continue;
+        cntB++;
+      }
+      if (cntB > 0) cntY++;
+      cntB = 0;
+    }
+    if (!cntY) return out;
+    ky = Math.floor(rnd() * cntY);
+    for (y0 = CFG.SPIKE_Y_MIN; y0 <= CFG.SPIKE_Y_MAX; y0 += CFG.SPIKE_Y_STEP) {
+      if (!hasDam) { if (ky-- === 0) break; continue; }
+      bc = top + y0 + CFG.SPIKE_BAND_H * 0.5;
+      for (by2 = top + CFG.DAM_Y_MIN; by2 <= top + CFG.DAM_Y_MAX; by2 += CFG.DAM_Y_STEP) {
+        if (top + y0 + CFG.SPIKE_BAND_H + CFG.BAND_DAM_CLEAR > by2) continue;
+        if (need > 0 && !guardFits(by2, bc, need, guardTy, top)) continue;
+        cntB++;
+      }
+      if (cntB > 0) { if (ky-- === 0) break; }
+      cntB = 0;
+    }
+    out.y0 = y0;
+    if (!hasDam) return out;
+    bc = top + y0 + CFG.SPIKE_BAND_H * 0.5;
+    kb = Math.floor(rnd() * cntB);
+    for (by2 = top + CFG.DAM_Y_MIN; by2 <= top + CFG.DAM_Y_MAX; by2 += CFG.DAM_Y_STEP) {
+      if (top + y0 + CFG.SPIKE_BAND_H + CFG.BAND_DAM_CLEAR > by2) continue;
+      if (need > 0 && !guardFits(by2, bc, need, guardTy, top)) continue;
+      if (kb-- === 0) break;
+    }
+    out.by = by2;
+    if (guardTy === 2) out.gy = by2 - CFG.GUARD_BUG_OFF;
+    else if (guardTy === 1) {
+      var lo = Math.max(top + CFG.TENANT_FLOOR_MIN, by2 - CFG.GUARD_SPIDER_OFF_HI);
+      var hi = by2 - CFG.GUARD_SPIDER_OFF_LO, n2 = 0, y2;
+      for (y2 = lo; y2 <= hi; y2 += CFG.SPIKE_Y_STEP) if (Math.abs(y2 - bc) >= need) n2++;
+      ky = n2 ? Math.floor(rnd() * n2) : -1;
+      for (y2 = lo; y2 <= hi; y2 += CFG.SPIKE_Y_STEP) {
+        if (Math.abs(y2 - bc) < need) continue;
+        if (ky-- === 0) { out.gy = y2; break; }
+      }
+      if (out.gy < 0) out.gy = Math.max(lo, Math.min(hi, bc - need));
+    }
+    return out;
+  }
+
+  function freeTenantFits(y, by, bc, need) {
+    if (by > 0 && y > by - CFG.TENANT_DAM_IN && y < by + CFG.BLOCK_THICK + CFG.TENANT_DAM_FALL) return false;
+    if (bc > 0 && Math.abs(y - bc) < need) return false;
+    return true;
+  }
+
+  /* 籽只往下飞、坝是全宽实心闸 ⇒ 紧贴坝下方的住户从上方打不到，破坝后又正好满速撞脸 */
+  function solveFreeTenant(top, by, bandY0, isSpider, rnd) {
+    var lo = top + CFG.TENANT_Y_MIN, hi = top + CFG.TENANT_Y_MAX;
+    var bc = bandY0 >= 0 ? top + bandY0 + CFG.SPIKE_BAND_H * 0.5 : -1;
+    var need = bc > 0 ? CFG.SPIKE_BAND_H * 0.5 + CFG.PLAYER_R + (isSpider ? CFG.GUARD_H_SPIDER : CFG.GUARD_H_BUG) : 0;
+    var y, cnt = 0;
+    for (y = lo; y <= hi; y += CFG.SPIKE_Y_STEP) if (freeTenantFits(y, by, bc, need)) cnt++;
+    if (!cnt) return -1;
+    var k = Math.floor(rnd() * cnt);
+    for (y = lo; y <= hi; y += CFG.SPIKE_Y_STEP) {
+      if (!freeTenantFits(y, by, bc, need)) continue;
+      if (k-- === 0) return y;
+    }
+    return -1;
+  }
+
   function buildFloor(n) {
     var top = (n - 1) * CFG.FLOOR_H;
     var f = { n: n, top: top, block: null, spike: null, fish: null, bug: null, frog: null, stones: null, pickups: [] };
@@ -444,10 +553,29 @@
       return f;
     }
 
-    if (rnd() < lerp(CFG.BLOCK_RATE_TOP, CFG.BLOCK_RATE_BOTTOM, t)) {
-      var by = top + 420 + rnd() * 600;
-      var hp = Math.round(lerp(CFG.BLOCK_HP_TOP, CFG.BLOCK_HP_BOTTOM, t * t));
-      f.block = { y: by, hp: hp, maxHp: hp, broken: false };
+    /* --- m4g D1：先定"有没有"，再联合解 y；原实现四者各自独立 roll，同层撞车 51.8% --- */
+    var wantBlock = rnd() < lerp(CFG.BLOCK_RATE_TOP, CFG.BLOCK_RATE_BOTTOM, t);
+    var wantSpike = n >= CFG.SPIKE_FROM && rnd() < lerp(CFG.SPIKE_RATE_TOP, CFG.SPIKE_RATE_BOTTOM, t);
+    var guardTy = 0, by = -1, bandY0 = -1, guardY = -1;
+    if (wantBlock) {
+      var gr = rnd();
+      if (gr < 0.5) guardTy = 1; else if (gr < 0.85) guardTy = 2;
+      by = top + CFG.DAM_Y_MIN + rnd() * (CFG.DAM_Y_MAX - CFG.DAM_Y_MIN);
+    }
+    if (wantSpike) {
+      var sol = solveBandDam(top, by, guardTy, rnd);
+      bandY0 = sol.y0;
+      by = sol.by;
+      guardY = sol.gy;
+    }
+    if (guardTy && guardY < 0) {
+      guardY = guardTy === 2 ? by - CFG.GUARD_BUG_OFF
+        : Math.max(top + CFG.TENANT_FLOOR_MIN, by - CFG.GUARD_SPIDER_OFF_LO - rnd() * (CFG.GUARD_SPIDER_OFF_HI - CFG.GUARD_SPIDER_OFF_LO));
+    }
+
+    if (by > 0) {
+      var bhp = Math.round(lerp(CFG.BLOCK_HP_TOP, CFG.BLOCK_HP_BOTTOM, t * t));
+      f.block = { y: by, hp: bhp, maxHp: bhp, broken: false };
     }
 
     /* B3 约束①：有坝必有补给——坝上方固定一个拾取；击杀成本↑后双份 30%→45%（m4a） */
@@ -460,8 +588,8 @@
       f.pickups.push(mkPickup(top + 500 + rnd() * 400, rnd, 'bag'));
     }
 
-    if (n >= CFG.SPIKE_FROM && rnd() < lerp(CFG.SPIKE_RATE_TOP, CFG.SPIKE_RATE_BOTTOM, t)) {
-      var sy = top + 320 + rnd() * 440;   // 只生在层中段：层界附近留安全窗，过界有喘息+观察时间
+    if (bandY0 >= 0) {
+      var sy = top + bandY0;   // 只生在层中段：层界附近留安全窗，过界有喘息+观察时间
       var halfW = shaftW(sy) * 0.5;
       var rawLen = lerp(CFG.SPIKE_LEN_MIN, CFG.SPIKE_LEN_MAX, rnd());
       var maxLen = Math.max(36, halfW - 70);
@@ -481,24 +609,17 @@
         var len1 = Math.round(Math.min(rawLen, maxLen));
         if (rnd() < 0.5) lenL = len1; else lenR = len1;
       }
-      f.spike = { y0: sy, y1: sy + 180, lenL: lenL, lenR: lenR };
+      f.spike = { y0: sy, y1: sy + CFG.SPIKE_BAND_H, lenL: lenL, lenR: lenR };
     }
 
-    /* B3 约束②：住户绑定坝——一层至多一户 */
-    if (f.block) {
-      var roll = rnd();
-      if (roll < 0.5) {
-        var fy = Math.max(top + 200, f.block.y - 300 - rnd() * 200);
-        f.fish = mkSpider(fy, rnd, t);
-      } else if (roll < 0.85) {
-        f.bug = mkBug(f.block.y - 150, rnd, t);
-      }
-    }
+    /* B3 约束②：住户绑定坝——一层至多一户，y 已由排位解出 */
+    if (guardTy === 1) f.fish = mkSpider(guardY, rnd, t);
+    else if (guardTy === 2) f.bug = mkBug(guardY, rnd, t);
     /* M4 统调：住户独立于坝生成（前段空走廊的根因是住户绑死在坝上） */
     if (!f.fish && !f.bug && n >= CFG.TENANT_FROM && rnd() < lerp(CFG.TENANT_RATE_TOP, CFG.TENANT_RATE_BOTTOM, t)) {
-      var ty = top + 260 + rnd() * 760;
-      if (rnd() < 0.6) f.fish = mkSpider(ty, rnd, t);
-      else f.bug = mkBug(ty, rnd, t);
+      var isSpider = rnd() < 0.6;
+      var ty = solveFreeTenant(top, by, bandY0, isSpider, rnd);
+      if (ty > 0) { if (isSpider) f.fish = mkSpider(ty, rnd, t); else f.bug = mkBug(ty, rnd, t); }
     }
 
     var cnt = (rnd() < 0.75 ? 1 : 0) + (rnd() < 0.15 ? 1 : 0);   // m4a：期望 0.8→0.9 个/层，补弱点收窄后的击杀成本
