@@ -323,7 +323,7 @@
   }
 
   /* ===================== 状态 ===================== */
-  var VER = 'm4l';
+  var VER = 'm4m';
   var S = null;
   var P = null;
   var gTier = 3;   // 血量档：1=3血(新手) 2=2血(标准) 3=1血(进阶)；本版默认 1 血交付手感
@@ -1177,8 +1177,13 @@
       if (S.shellT > 0) S.shellT--;
       /* m4f 换层补给：子弹兼"杀敌+位移滞空"双开销，每往下进一层压入一发量（上行不给，防蹦层刷弹） */
       if (deeper) P.ammo = Math.min(ammoCap(), P.ammo + CFG.RELOAD_PER_FLOOR);
-      if (linePerk('econ') && nf % 25 === 0) P.ammo = ammoCap();   // 经济大成：每 25 层回满
       if (!S.pick3 && nf > S.lastPick3Floor && nf % 10 === 0 && nf < CFG.TOTAL_FLOORS) {
+        S.lastPick3Floor = nf;
+        offerPick3(nf);
+      }
+      /* 经济大成＝每 25 层白送一次三选一（原"回满"与已砍的补给卡同病）。放在常规发牌之后共用守卫：
+         50 层与常规同层不叠加，白送实际落在 25 / 75 两个关底前 */
+      if (linePerk('econ') && nf % 25 === 0 && !S.pick3 && nf > S.lastPick3Floor && nf < CFG.TOTAL_FLOORS) {
         S.lastPick3Floor = nf;
         offerPick3(nf);
       }
