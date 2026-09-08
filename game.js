@@ -340,7 +340,7 @@
   }
 
   /* ===================== 状态 ===================== */
-  var VER = 'm4o';
+  var VER = 'm4p';
   var S = null;
   var P = null;
   var gTier = 3;   // 血量档：1=3血(新手) 2=2血(标准) 3=1血(进阶)；本版默认 1 血交付手感
@@ -2495,7 +2495,21 @@
   document.getElementById('btn-restart').addEventListener('click', function () { newRun(); });
   document.getElementById('btn-again').addEventListener('click', function () { newRun(); });
   document.getElementById('btn-jump').addEventListener('click', function () { jumpFloors(10); });
-  document.getElementById('btn-flood').addEventListener('click', function () { if (!S.waterOn) triggerFlood(); });
+  /* 调试直达：落在 Boss 上方 300px。籽的射程只有约 400px，420 会压在边缘（实测第一发要 1.2 秒才打到，
+     会让人误判成"打不到"）；落点也不能低于它的背——那会直接触发通关判定，什么也测不到 */
+  document.getElementById('btn-boss').addEventListener('click', function () {
+    if (S.over) return;
+    var bsn = floorAt(CFG.TOTAL_FLOORS).boss;
+    P.y = bsn.y - 300;
+    P.vy = 0;
+    P.ammo = ammoCap();
+    P.dwell = 0;
+    S.camY = P.y - VIEW.h * CFG.CAM_ANCHOR;
+  });
+  document.getElementById('btn-flood').addEventListener('click', function () {
+    if (S.waterOn || floorAt(CFG.TOTAL_FLOORS).boss.alive) return;   // Boss 层的水位归它自己的状态机管
+    triggerFlood();
+  });
   document.getElementById('btn-debug').addEventListener('click', function () { gDebug = !gDebug; });
   function toggleAudio() {
     AU.on = !AU.on;
