@@ -200,6 +200,8 @@
 
   function lvl(id) { return (P && P.mods && P.mods[id]) || 0; }
   function tierMaxHp() { return CFG.TIER_HP[gTier - 1] || 3; }
+  var TIER_NAMES = ['简单', '标准', '困难'];
+  function tierName(t) { return TIER_NAMES[t - 1] || '标准'; }
   function atkLevels() {
     return lvl('split') + lvl('rate') + lvl('hard') + lvl('blast') + lvl('pierce') + lvl('wind') + lvl('mega') + lvl('hammer');
   }
@@ -321,7 +323,7 @@
   }
 
   /* ===================== 状态 ===================== */
-  var VER = 'm4i';
+  var VER = 'm4j';
   var S = null;
   var P = null;
   var gTier = 3;   // 血量档：1=3血(新手) 2=2血(标准) 3=1血(进阶)；本版默认 1 血交付手感
@@ -2127,15 +2129,15 @@
       ' · 射出 ' + S.shots + ' 颗籽' +
       ' · 破障 ' + S.brokeBlocks +
       ' · 挨 ' + S.hitsTaken + ' 下' +
-      '\n血档 ' + gTier + (gTier === 1 ? '（3血）' : (gTier === 2 ? '（2血）' : '（1血）')) +
+      '\n' + tierName(gTier) + '（' + tierMaxHp() + ' 血）' +
       ' · 井宽在最深处 ' + Math.round(shaftW(P.deepest * CFG.FLOOR_H)) + 'px' +
       '\n纪录 ' + gSave.deepest + ' 层 · 今日第 ' + gSave.todayTries + ' 次 · 累计 ' + gSave.totalRuns + ' 局';
     elResMeta.textContent = meta;
     elHint.textContent = gTier === 1
-      ? '3 血档：能错三次，用来熟悉走位和缺口'
+      ? '简单档：能错三次，用来熟悉走位和缺口'
       : (gTier === 2
-        ? '2 血档：标准难度，两下就没'
-        : '1 血档：碰到就没——走位就是命');
+        ? '标准档：两下就没'
+        : '困难档：碰到就没——走位就是命');
     syncTierBtns();
     elShareBtns.className = 'hidden';
     elReportImg.className = 'hidden';
@@ -2262,7 +2264,7 @@
 
   /* ===================== 首页 ===================== */
   function fillHome() {
-    var ctl = '一根手指：按住屏幕左／右侧就往那边走，同时往下吐籽';
+    var ctl = '一根手指按住左右侧：往那边走，籽自己往下掉';
     elHomeStat.textContent = (gSave && gSave.totalRuns)
       ? ctl + '\n今日井 第 ' + gSave.todayBest + ' 层 · 历史最深 第 ' + gSave.deepest + ' 层 · 累计下井 ' + gSave.totalRuns + ' 次'
       : ctl;

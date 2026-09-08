@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>尖叫之井 · M0-a 手感对比原型</title>
-<link rel="stylesheet" href="./style.css?v=m4i">
+<link rel="stylesheet" href="./style.css?v=m4j">
 </head>
 <body>
 <div id="proto-bar">
-  <span id="proto-tag">m4i</span>
+  <span id="proto-tag">m4j</span>
   <button type="button" class="xb" id="btn-x1">3血</button>
   <button type="button" class="xb" id="btn-x2">2血</button>
   <button type="button" class="xb" id="btn-x3">1血</button>
@@ -25,18 +25,18 @@
   <canvas id="cv"></canvas>
 </div>
 <div id="home">
-  <div id="home-kicker">王国史 · 第二章</div>
-  <div id="home-title">尖叫之井</div>
-  <div id="home-sub">土拨鼠怎么掉井了</div>
-  <div id="home-desc">一口 99 层的干井。往下嗑瓜子开路——<br>坝挡道，住户抢粮，潭水在脚下涨。</div>
-  <div id="home-tier">
-    <div class="ht" id="ht1"><b>3 血</b><span>新手 · 可以错两次</span></div>
-    <div class="ht" id="ht2"><b>2 血</b><span>标准 · 只许错一次</span></div>
-    <div class="ht" id="ht3"><b>1 血</b><span>进阶 · 一次都不能错</span></div>
+  <div id="home-inner">
+    <div id="home-kicker">王国史 · 第二章</div>
+    <div id="home-title">尖叫之井</div>
+    <div id="home-tier">
+      <div class="ht" id="ht1"><b>简单</b><span>3 血</span></div>
+      <div class="ht" id="ht2"><b>标准</b><span>2 血</span></div>
+      <div class="ht" id="ht3"><b>困难</b><span>1 血</span></div>
+    </div>
+    <button type="button" id="btn-start">下井</button>
+    <div id="home-stat"></div>
+    <div id="home-foot"><span id="home-ver"></span><button type="button" id="btn-mute">音频:开</button></div>
   </div>
-  <button type="button" id="btn-start">下 井</button>
-  <div id="home-stat"></div>
-  <div id="home-foot"><span id="home-ver"></span><button type="button" id="btn-mute">音频:开</button></div>
 </div>
 <div id="result" class="hidden">
   <div id="result-card">
@@ -67,6 +67,6 @@
     <div id="pick3-hint">点一张带走 · 每 10 层一次</div>
   </div>
 </div>
-<script src="./game.js?v=m4i"></script>
+<script src="./game.js?v=m4j"></script>
 </body>
 </html>
