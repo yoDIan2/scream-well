@@ -82,6 +82,8 @@ html, body {
   z-index: 30;
   background: rgba(8, 9, 13, 0.5);
   text-align: center;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -173,6 +175,8 @@ html, body {
   z-index: 25;
   background: rgba(8, 9, 13, 0.72);
   text-align: center;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -300,8 +304,10 @@ html, body {
   box-sizing: border-box;
   display: flex;
   overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
   text-align: center;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  will-change: transform;
   background: linear-gradient(180deg, rgba(6, 7, 10, 0.34) 0%, rgba(6, 7, 10, 0.74) 40%, rgba(4, 5, 8, 0.96) 100%);
   padding: 20px 22px 16px;
   padding-top: calc(20px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
@@ -404,13 +410,13 @@ html, body {
 }
 
 @-webkit-keyframes ctaBreathe {
-  0%, 100% { filter: brightness(1); }
-  50% { filter: brightness(1.14); }
+  0%, 100% { background-color: #d14c48; }
+  50% { background-color: #e75f58; }
 }
 
 @keyframes ctaBreathe {
-  0%, 100% { filter: brightness(1); }
-  50% { filter: brightness(1.14); }
+  0%, 100% { background-color: #d14c48; }
+  50% { background-color: #e75f58; }
 }
 
 #home-stat {
