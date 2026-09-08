@@ -97,6 +97,10 @@
     MAGNET_PULL: 9,         // 磁吸强度（每秒）
     HARD_LAND_SPEED: 1050,  // 落地速度超过此值 = 扣血
     SOFT_LAND_SPEED: 650,   // 超过此值 = 大弹开（不扣血）
+    MEGA_VY: 900,           // 扩音器判定速度：下落上限=900+4×层，取 900 才可能在浅层触发（m4l）
+    WIND_ACC: 900,          // 追风籽横向转向加速度（原 320：整段飞行只偏 48px，看不见）
+    WIND_VX_MAX: 420,       // 追风籽横向速度上限（原 240）
+    WIND_R: 900,            // 追风籽索敌距离（原 600）
     T_MAGNET: true,
     T_HARDLAND: true,
     T_BIGFISH: true,
@@ -154,20 +158,20 @@
   /* ===================== M2 构筑：改装池（§9 全 10 项）+ 遗物（§9 全 8 件） ===================== */
   var MODS = [
     { id: 'split',   name: '分裂壳', max: 2, line: 'volley', tier: 1, desc: '出膛一分为三',  desc2: '再分，共五份' },
-    { id: 'bounce',  name: '跳弹簧', max: 2, line: 'volley', tier: 1, desc: '籽碰壁反弹一次', desc2: '反弹两次' },
+    { id: 'bounce',  name: '跳弹簧', max: 2, line: 'volley', tier: 1, desc: '籽被收窄的井壁弹回井心', desc2: '可弹两次' },
     { id: 'rate',    name: '连发嗑', max: 2, line: 'volley', tier: 1, desc: '射速 +30%',     desc2: '射速再 +30%' },
     { id: 'hard',    name: '硬壳籽', max: 2, line: 'volley', tier: 1, desc: '籽伤害 +1',     desc2: '伤害再 +1' },
     { id: 'spring',  name: '弹簧托', max: 2, line: 'move',   tier: 1, desc: '后坐力 +25%',   desc2: '后坐力再 +25%' },
     { id: 'pouch',   name: '深颊囊', max: 2, line: 'econ',   tier: 1, desc: '弹上限+10 拾取更远', desc2: '再+10 再远 30%' },
-    { id: 'blast',   name: '炸壳弹', max: 2, line: 'volley', tier: 2, desc: '命中处小范围炸开住户', desc2: '炸的范围 +50%' },
+    { id: 'blast',   name: '炸壳弹', max: 1, line: 'volley', tier: 2, desc: '打碎坝时余波震死同层住户' },
     { id: 'pierce',  name: '穿甲仁', max: 2, line: 'volley', tier: 1, desc: '籽可多穿 1 个目标', desc2: '再多穿 1 个' },
-    { id: 'wind',    name: '追风籽', max: 1, line: 'volley', tier: 2, desc: '轻微追踪最近的住户' },
+    { id: 'wind',    name: '追风籽', max: 1, line: 'volley', tier: 2, desc: '籽会拐弯追最近的住户' },
     { id: 'feather', name: '伞尾毛', max: 1, line: 'move',   tier: 1, desc: '下坠上限 -12%，更可控' },
     { id: 'gut',     name: '开膛钩', max: 1, line: 'aim',    tier: 2, desc: '命中弱点后，下一发伤害翻倍' },
     { id: 'gaze',    name: '凝视',   max: 1, line: 'aim',    tier: 1, desc: '命中弱点后 1 秒内，后坐力 +30%' },
     { id: 'eye',     name: '鹰眼',   max: 1, line: 'aim',    tier: 1, desc: '弱点窗口 +20%' },
     { id: 'hammer',  name: '重锤籽', max: 1, line: 'aim',    tier: 2, desc: '伤害 +1，但弹速 -25%' },
-    { id: 'hold',    name: '屏息',   max: 1, line: 'volley', tier: 2, desc: '两发间隔超 0.5 秒时，伤害翻倍' },
+    { id: 'hold',    name: '屏息',   max: 1, line: 'volley', tier: 2, desc: '两发间隔超 0.3 秒时，伤害翻倍' },
     { id: 'fin',     name: '侧风鳍', max: 1, line: 'move',   tier: 2, desc: '横移 +30%，但下落上限 +8%' }
   ];
 
@@ -178,12 +182,8 @@
     { id: 'map',    name: '村长假图纸',   line: 'econ',   tier: 2, desc: '通开关底免费送一次三选一' },
     { id: 'salt',   name: '咸瓜子',       line: 'econ',   tier: 1, desc: '串丝蛛撞你先被咸晕' },
     { id: 'echo',   name: '会回音的井段', line: 'volley', tier: 2, desc: '籽飞出屏幕底部会弹回来一次' },
-    { id: 'seedbag',name: '向日葵籽袋',   line: 'econ',   tier: 1, desc: '每过 10 层颊囊回满' },
     { id: 'mega',   name: '尖叫扩音器',   line: 'volley', tier: 2, desc: '高速下坠时打籽伤害 +1' },
-    { id: 'loan',   name: '淘井人贷款',   line: 'econ',   tier: 2, desc: '立刻 +15 弹，之后 2 层拾取减半' },
-    { id: 'kit',    name: '应急包',       line: 'econ',   tier: 1, desc: '空手状态下拾取翻倍' },
-    { id: 'shell',  name: '龟壳护身',     line: 'move',   tier: 3, desc: '免死一次，但之后 2 层水涨得更快' },
-    { id: 'crate',  name: '遗弃的弹药箱', line: 'volley', tier: 3, desc: '立刻回满弹，本层补给全部消失' }
+    { id: 'shell',  name: '龟壳护身',     line: 'move',   tier: 3, desc: '免死一次，但之后 2 层水涨得更快' }
   ];
 
   /* 卡片图标：只用 Unicode ≤9 的 emoji（Android 8.1 出厂字库可渲染，不缺字） */
@@ -192,10 +192,10 @@
     spring: '\u2B06\uFE0F', pouch: '\u{1F45D}', blast: '\u{1F4A5}', pierce: '\u2694\uFE0F',
     wind: '\u{1F300}',   feather: '\u2602\uFE0F',
     amulet: '\u{1F4FF}', egg: '\u{1F95A}',   ball: '\u26BD',     map: '\u{1F4DC}',
-    salt: '\u{1F330}',   echo: '\u{1F50A}',  seedbag: '\u{1F33B}', mega: '\u{1F4E3}',
+    salt: '\u{1F330}',   echo: '\u{1F50A}',  mega: '\u{1F4E3}',
     gut: '\u{1F52A}',    gaze: '\u{1F441}\uFE0F', eye: '\u{1F50D}',  hammer: '\u{1F528}',
-    hold: '\u231B',      fin: '\u{1F42C}',   loan: '\u{1F4B3}',  kit: '\u{1F392}',
-    shell: '\u{1F422}',  crate: '\u{1F4E6}'
+    hold: '\u231B',      fin: '\u{1F42C}',
+    shell: '\u{1F422}'
   };
 
   function lvl(id) { return (P && P.mods && P.mods[id]) || 0; }
@@ -323,7 +323,7 @@
   }
 
   /* ===================== 状态 ===================== */
-  var VER = 'm4k';
+  var VER = 'm4l';
   var S = null;
   var P = null;
   var gTier = 3;   // 血量档：1=3血(新手) 2=2血(标准) 3=1血(进阶)；本版默认 1 血交付手感
@@ -381,7 +381,7 @@
       frogCorpse: null,
       frogText: null,
       floatTexts: [],
-      lastShotT: -1, chargeNext: false, loanT: 0, shellT: 0, pickRound: 0, frogKills: 0,
+      lastShotT: -1, chargeNext: false, burned: {}, shellT: 0, pickRound: 0, frogKills: 0,
       flashT: 0,
       animT: 0
     };
@@ -658,7 +658,7 @@
         b.live = true;
         b.x = x; b.y = y;
         b.vx = vx || 0;
-        var dm = 1 + lvl('hard') + ((P.mods.mega && Math.abs(P.vy) >= 1200) ? 1 : 0) + lvl('hammer');
+        var dm = 1 + lvl('hard') + ((P.mods.mega && Math.abs(P.vy) >= CFG.MEGA_VY) ? 1 : 0) + lvl('hammer');
         if (S.chargeNext) dm *= 2;
         if (P.gutArmed) { dm *= 2; P.gutArmed = false; }
         b.dmg = dm;
@@ -696,7 +696,7 @@
     if (P.ammo <= 0 || P.fireCd > 0) return;
     var prevShotT = S.lastShotT;
     S.lastShotT = S.runT;
-    S.chargeNext = !!(P.mods.hold && prevShotT >= 0 && S.runT - prevShotT > 0.5);
+    S.chargeNext = !!(P.mods.hold && prevShotT >= 0 && S.runT - prevShotT > 0.3);
     P.ammo--;
     P.fireCd = CFG.FIRE_CD / (1 + 0.3 * lvl('rate') + (linePerk('volley') ? 0.2 : 0));
     S.shots++;
@@ -962,8 +962,6 @@
           pk.taken = true;
           var amtG = pk.amt;
           if (linePerk('econ') && pk.kind !== 'bag') amtG = 8;   // 经济大成：拾取全变袋
-          if (P.mods.kit && P.ammo === 0) amtG *= 2;              // 应急包：空手翻倍
-          if (S.loanT > 0) amtG = Math.ceil(amtG * 0.5);          // 贷款期：拾取减半
           P.ammo = Math.min(ammoCap(), P.ammo + amtG);
           if (S.ammoOutT >= 0 && P.ammo > 0) S.ammoOutT = -1;
           burst(pk.x, pk.y, 6, '#e8b23a', 130);
@@ -976,9 +974,9 @@
       var bu = S.bullets[bi];
       if (!bu.live) continue;
       bu.y += (bu.sp || CFG.SEED_SPEED) * bu.dirY * dt;
-      /* 追风籽：下方 600px 内最近住户，轻微转向牵引 */
+      /* 追风籽：下方 CFG.WIND_R 内最近住户，明显转向牵引（m4l 前是 48px 微偏，看不见） */
       if (lvl('wind') > 0) {
-        var bestDy = 600, tgt = null;
+        var bestDy = CFG.WIND_R, tgt = null;
         var nf2 = floorOf(bu.y);
         for (var sc = 0; sc < 2; sc++) {
           var sf2 = floorAt(Math.min(CFG.TOTAL_FLOORS, nf2 + sc));
@@ -986,18 +984,23 @@
           if (sf2.bug && sf2.bug.alive && sf2.bug.y > bu.y && sf2.bug.y - bu.y < bestDy) { bestDy = sf2.bug.y - bu.y; tgt = sf2.bug; }
         }
         if (tgt) {
-          bu.vx = clamp((bu.vx || 0) + (tgt.x > bu.x ? 1 : -1) * 320 * dt, -240, 240);
+          bu.vx = clamp((bu.vx || 0) + (tgt.x > bu.x ? 1 : -1) * CFG.WIND_ACC * dt, -CFG.WIND_VX_MAX, CFG.WIND_VX_MAX);
         }
       }
-      if (bu.vx) {
-        bu.x += bu.vx * dt;
-        var bwl = shaftL(bu.y) + 5, bwr = shaftR(bu.y) - 5;
-        if (bu.x < bwl && bu.vx < 0) {
-          if (bu.bounces < bu.bMax) { bu.bounces++; bu.vx = -bu.vx; bu.x = bwl; }
-          else { bu.live = false; continue; }
-        } else if (bu.x > bwr && bu.vx > 0) {
-          if (bu.bounces < bu.bMax) { bu.bounces++; bu.vx = -bu.vx; bu.x = bwr; }
-          else { bu.live = false; continue; }
+      var bwl = shaftL(bu.y) + 5, bwr = shaftR(bu.y) - 5;
+      if (bu.vx) bu.x += bu.vx * dt;
+      if (bu.x < bwl || bu.x > bwr) {
+        var inLeft = bu.x < bwl;
+        var intoWall = inLeft ? bu.vx < 0 : bu.vx > 0;
+        if (bu.bounces < bu.bMax) {
+          /* 跳弹簧：被收窄/游走的井壁夹住也算一次反弹，弹回井心方向 */
+          bu.bounces++;
+          bu.x = inLeft ? bwl : bwr;
+          bu.vx = inLeft ? 150 : -150;
+        } else if (intoWall) {
+          bu.live = false; continue;
+        } else {
+          bu.x = clamp(bu.x, bwl, bwr);
         }
       }
       /* 会回音的井段：飞出屏幕底部弹回一次 */
@@ -1019,25 +1022,17 @@
           S.shake = 0.22;
           S.flashT = 0.15;
           burst(bu.x, bf.block.y + 20, 14, '#a9814e', 260);
-        }
-        /* 炸壳弹：命中坝时炸同层半径内的住户 */
-        if (lvl('blast') > 0) {
-          var brad = 40 * (1 + 0.5 * (lvl('blast') - 1));
-          var brad2 = brad * brad;
-          if (bf.fish && bf.fish.alive) {
-            var bax = bu.x - bf.fish.x, bay = bu.y - bf.fish.y;
-            if (bax * bax + bay * bay < brad2) {
-              bf.fish.alive = false;
-              bf.pickups.push({ x: bf.fish.x, y: bf.fish.y, kind: 'jar', amt: 2, taken: false });
-            }
+          /* 炸壳弹＝破坝余波：D1 后住户离坝至少 150px，原来的 40px 溅射永远够不到，故改在碎坝瞬间结算 */
+          var bkill = lvl('blast');
+          if (bkill > 0 && bf.fish && bf.fish.alive) {
+            bf.fish.alive = false; bkill--;
+            bf.pickups.push({ x: bf.fish.x, y: bf.fish.y, kind: 'jar', amt: 2, taken: false });
+            burst(bf.fish.x, bf.fish.y, 8, '#e8d9a8', 170);
           }
-          if (bf.bug && bf.bug.alive) {
-            var bbx = bu.x - bf.bug.x, bby = bu.y - bf.bug.y;
-            if (bbx * bbx + bby * bby < brad2) bf.bug.hp -= bu.dmg;
-            if (bf.bug.hp <= 0) {
-              bf.bug.alive = false;
-              bf.pickups.push({ x: bf.bug.x, y: bf.bug.y, kind: 'jar', amt: 4, taken: false });
-            }
+          if (bkill > 0 && bf.bug && bf.bug.alive) {
+            bf.bug.alive = false;
+            bf.pickups.push({ x: bf.bug.x, y: bf.bug.y, kind: 'jar', amt: 4, taken: false });
+            burst(bf.bug.x, bf.bug.y, 8, '#e8d9a8', 170);
           }
         }
         if (bu.pierce > 0) { bu.pierce--; bu.y = bf.block.y + CFG.BLOCK_THICK + 2; }
@@ -1179,12 +1174,10 @@
       var deeper = nf > S.lastFloor;
       S.lastFloor = nf;
       P.dwell = 0;
-      if (S.loanT > 0) S.loanT--;
       if (S.shellT > 0) S.shellT--;
       /* m4f 换层补给：子弹兼"杀敌+位移滞空"双开销，每往下进一层压入一发量（上行不给，防蹦层刷弹） */
       if (deeper) P.ammo = Math.min(ammoCap(), P.ammo + CFG.RELOAD_PER_FLOOR);
       if (linePerk('econ') && nf % 25 === 0) P.ammo = ammoCap();   // 经济大成：每 25 层回满
-      if (nf % 10 === 0 && P.mods.seedbag) P.ammo = ammoCap();
       if (!S.pick3 && nf > S.lastPick3Floor && nf % 10 === 0 && nf < CFG.TOTAL_FLOORS) {
         S.lastPick3Floor = nf;
         offerPick3(nf);
@@ -1789,6 +1782,17 @@
 
   function drawPlayer() {
     var blink = P.invuln > 0 && (Math.floor(S.t * 14) % 2 === 0);
+    /* 凝视窗口可见化：1 秒的 +30% 后坐力此前毫无反馈，光环随窗口收尾扩张淡出 */
+    if (P.mods.gaze && P.gazeT > 0) {
+      ctx.save();
+      ctx.strokeStyle = '#e8b23a';
+      ctx.globalAlpha = 0.3 + 0.5 * P.gazeT;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(P.x, P.y, 36 + (1 - P.gazeT) * 14, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
     if (IMG.jiao) {
       ctx.save();
       ctx.translate(P.x, P.y);
@@ -1845,6 +1849,13 @@
       ctx.beginPath();
       ctx.moveTo(hx - 10, hy + 4); ctx.lineTo(hx + 22, hy + 4); ctx.lineTo(hx + 6, hy + 24);
       ctx.closePath(); ctx.fill();
+    }
+    /* 凝视窗口读数：让光环有名字 */
+    if (P.mods.gaze && P.gazeT > 0) {
+      ctx.fillStyle = '#e8b23a';
+      ctx.font = '800 14px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('凝视 ' + ((P.gazeT * 10 | 0) / 10) + 's', 18, 72);
     }
     /* 层数 */
     ctx.fillStyle = '#f2ead8';
@@ -1925,13 +1936,13 @@
     '被看天蛙闷了一口': '蛙口', '被蛙喷的石子砸中': '石雨',
     '硬着陆': '硬着陆', '被潭水漫过': '潭水'
   };
-  var TIER_NAME = ['新手', '标准', '进阶'];
+  var TIER_NAME = ['简单', '标准', '困难'];
 
   /* ===================== 战报卡与分享（§11） ===================== */
   var MOD_SHORT = {
     split: '裂', bounce: '弹', rate: '连', hard: '硬', spring: '托', pouch: '囊',
     blast: '炸', pierce: '穿', wind: '风', feather: '伞',
-    amulet: '符', egg: '蛋', ball: '球', map: '图', salt: '咸', echo: '音', seedbag: '袋', mega: '麦'
+    amulet: '符', egg: '蛋', ball: '球', map: '图', salt: '咸', echo: '音', mega: '麦'
   };
 
   function buildReportCard() {
@@ -2329,27 +2340,32 @@
     var rnd = mulberry32(hashStr(S.seedKey + '#m' + n + '#' + S.pickRound));
     var phase = S.pickRound <= 3 ? 1 : (S.pickRound <= 6 ? 2 : 3);
     var lock = lockedLine();
-    var noSurvival = gTier === 3;   // 1 血档：生存类遗物无意义
+    var noSurvival = gTier === 3;   // 1 血档：回血与"延后第二下"类无意义（咸瓜子是真免伤，留着）
     var avail = [];
     var i, m;
     for (i = 0; i < MODS.length; i++) {
       m = MODS[i];
-      if (lvl(m.id) >= m.max || m.tier > phase) continue;
+      if (lvl(m.id) >= m.max || m.tier > phase || S.burned[m.id]) continue;
       if (lock && m.line !== lock) continue;
       avail.push(m);
     }
     for (i = 0; i < RELICS.length; i++) {
       m = RELICS[i];
-      if (lvl(m.id) || m.tier > phase) continue;
+      if (lvl(m.id) || m.tier > phase || S.burned[m.id]) continue;
       if (lock && m.line !== lock) continue;
-      if (noSurvival && (m.id === 'egg' || m.id === 'amulet' || m.id === 'salt')) continue;
+      if (noSurvival && (m.id === 'egg' || m.id === 'amulet')) continue;
       avail.push(m);
     }
     if (lock && avail.length < 3) {
-      /* 锁系后池子枯竭：兜底放开全池，绝不空手 */
+      /* 锁系后池子枯竭：兜底放开全池，绝不空手（烧掉的卡仍然不放回来） */
       avail = [];
-      for (i = 0; i < MODS.length; i++) if (lvl(MODS[i].id) < MODS[i].max) avail.push(MODS[i]);
-      for (i = 0; i < RELICS.length; i++) if (!lvl(RELICS[i].id)) avail.push(RELICS[i]);
+      for (i = 0; i < MODS.length; i++) if (lvl(MODS[i].id) < MODS[i].max && !S.burned[MODS[i].id]) avail.push(MODS[i]);
+      for (i = 0; i < RELICS.length; i++) {
+        m = RELICS[i];
+        if (lvl(m.id) || S.burned[m.id]) continue;
+        if (noSurvival && (m.id === 'egg' || m.id === 'amulet')) continue;
+        avail.push(m);
+      }
     }
     for (var j = avail.length - 1; j > 0; j--) {
       var k = Math.floor(rnd() * (j + 1));
@@ -2416,12 +2432,14 @@
     S.pickLog.push({ floor: S.pick3.floor, id: id });
     if (id === 'egg') P.hp = Math.min(tierMaxHp(), P.hp + 1);
     if (id === 'pouch' && P.ammo > ammoCap()) P.ammo = ammoCap();
-    /* m4a 取舍卡落地即结算：贷款=先拿15发，弹药箱=回满但本层补给清空 */
-    if (id === 'loan') { P.ammo = Math.min(ammoCap(), P.ammo + 15); S.loanT = 2; }
-    if (id === 'crate') {
-      P.ammo = ammoCap();
-      var fcr = floorAt(P.floor);
-      for (var cri = 0; cri < fcr.pickups.length; cri++) fcr.pickups[cri].taken = true;
+    /* m4l 烧牌：未选的两张里按日期种子确定性地烧掉一张，本局不再出现（选择必须有代价） */
+    var rest = [];
+    for (var ri = 0; ri < S.pick3.offers.length; ri++) {
+      if (S.pick3.offers[ri].id !== id) rest.push(S.pick3.offers[ri].id);
+    }
+    if (rest.length > 1) {
+      var brn = mulberry32(hashStr(S.seedKey + '#burn' + S.pick3.floor + '#' + S.pickRound));
+      S.burned[rest[Math.floor(brn() * rest.length)]] = 1;
     }
     S.pick3 = null;
     elPick3.className = 'hidden';
