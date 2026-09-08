@@ -105,6 +105,23 @@
     T_HARDLAND: true,
     T_BIGFISH: true,
 
+    /* ==== m4o 井底 Boss「漫堤鱼」：暗河的鱼，比看天蛙强一档（强在机制维度，不在血量） ==== */
+    BOSS_HP: 30,             // = 最强那只蛙(75关满构筑)同级；弹药算术的上限就在这
+    BOSS_MOUTH_W: 190,       // 嘴宽：弱点窗口
+    BOSS_OPEN_T: 0.8,        // 张嘴窗口（蛙是 1.0，收紧一档）
+    BOSS_CLOSE_T: 1.4,       // 闭嘴挡弹期
+    BOSS_SWAY: 96,           // 嘴心左右游的幅度——蛙钉在井心，它不固定
+    BOSS_SWAY_SPD: 0.9,
+    BOSS_Y_OFF: 980,         // 在井底层的悬挂位置（层顶往下）
+    BOSS_PHASE2: 0.66,       // 血量降到此比例开始吸水
+    BOSS_PHASE3: 0.33,       // 再降到此比例就只喷不吸（第二轮收尾）
+    BOSS_FILL: 650,          // 水线停在 boss 上方 650px：>籽的 400px 射程 ⇒ 物理上打不到
+    BOSS_RISE_T: 4,          // 涨水 4 秒
+    BOSS_HOLD_T: 6,          // 停位 6 秒：纯躲+点射维持高度，这段时间是消耗
+    BOSS_DRAIN_T: 1.5,       // 退水 1.5 秒：看得见"窗口开了"
+    BOSS_SPIT_T: 2.6,        // 喷水柱间隔
+    BOSS_BAGS: 3,            // 退水吐出 3 袋 = 24 发，抵掉爬高的弹药账
+
     LAT_MAX: 340,           // 手动横向速度上限
     LAT_ACCEL: 1800,        // 按住侧的横向加速度
     LAT_DAMP: 8.0,          // 松手横向阻尼（每秒衰减系数）
@@ -323,7 +340,7 @@
   }
 
   /* ===================== 状态 ===================== */
-  var VER = 'm4n';
+  var VER = 'm4o';
   var S = null;
   var P = null;
   var gTier = 3;   // 血量档：1=3血(新手) 2=2血(标准) 3=1血(进阶)；本版默认 1 血交付手感
@@ -381,7 +398,7 @@
       frogCorpse: null,
       frogText: null,
       floatTexts: [],
-      lastShotT: -1, chargeNext: false, burned: {}, shellT: 0, pickRound: 0, frogKills: 0,
+      lastShotT: -1, chargeNext: false, burned: {}, shellT: 0, pickRound: 0, frogKills: 0, bossKilled: false,
       flashT: 0,
       animT: 0
     };
@@ -557,6 +574,19 @@
       f.frog = { y: top + 640, hp: fhp, maxHp: fhp, alive: true, open: true, t: 0, openness: 1, mouthW: 170, hitT: -9 };
       f.stones = [];
       f.pickups.push(mkPickup(top + 300, rnd, 'jar'));
+      return f;
+    }
+
+    /* 井底层（99）：暗河的鱼独占。它的背＝玩家落脚点，所以它活着时落不到底＝不会提前通关 */
+    if (n === CFG.TOTAL_FLOORS) {
+      var by2 = top + CFG.BOSS_Y_OFF;
+      f.boss = {
+        y: by2, hp: CFG.BOSS_HP, maxHp: CFG.BOSS_HP, alive: true,
+        open: true, t: 0, openness: 1, mouthCx: shaftCx(by2), hitT: -9,
+        phase: 1, sp: 0, wstate: 'idle', wt: 0, drains: 0
+      };
+      f.stones = [];
+      f.pickups.push(mkPickup(top + 240, rnd, 'bag'));
       return f;
     }
 
@@ -797,6 +827,56 @@
     showResult();
   }
 
+  /* ===================== m4o 井底 Boss：喷水与水位状态机 ===================== */
+  function bossSpit(bs, f, cnt) {
+    var lead = clamp((P.x - bs.mouthCx) * 1.4, -230, 230);
+    for (var i = 0; i < cnt; i++) {
+      var off = (i - (cnt - 1) / 2) * 26;
+      f.stones.push({
+        x: bs.mouthCx + off, y: bs.y - 40,
+        vx: lead + (i - (cnt - 1) / 2) * 120,
+        vy: -660 - ((i * 37 + (f.stones.length * 13) % 90) % 90)
+      });
+    }
+    burst(bs.mouthCx, bs.y - 46, 5, '#7fb6d9', 170);
+  }
+
+  /* 吸水→涨→停→退。水线停在 boss 上方 BOSS_FILL 处：超过籽的 400px 射程，"打不到"是物理后果不是无敌 */
+  function bossWater(bs, f, dt) {
+    var riseTo = bs.y - CFG.BOSS_FILL;
+    if (bs.wstate === 'idle') return;
+    bs.wt += dt;
+    if (bs.wstate === 'warn') {
+      if (bs.wt >= 0.8) { bs.wstate = 'rise'; bs.wt = 0; S.waterOn = true; }
+      return;
+    }
+    if (bs.wstate === 'rise') {
+      var k = Math.min(1, bs.wt / CFG.BOSS_RISE_T);
+      S.waterY = (bs.y + 300) + (riseTo - (bs.y + 300)) * k;
+      S.waterTop = S.waterY;
+      if (k >= 1) { bs.wstate = 'hold'; bs.wt = 0; }
+      return;
+    }
+    if (bs.wstate === 'hold') {
+      S.waterY = riseTo; S.waterTop = riseTo;
+      bs.sp += dt;
+      if (bs.sp > 1.3) { bs.sp = 0; bossSpit(bs, f, 4); }
+      if (bs.wt >= CFG.BOSS_HOLD_T) { bs.wstate = 'drain'; bs.wt = 0; }
+      return;
+    }
+    if (bs.wstate === 'drain') {
+      var k2 = Math.min(1, bs.wt / CFG.BOSS_DRAIN_T);
+      S.waterY = riseTo + (bs.y + 900 - riseTo) * k2;
+      S.waterTop = S.waterY;
+      if (k2 >= 1) {
+        bs.wstate = 'idle'; bs.wt = 0; bs.drains++; S.waterOn = false;
+        var brnd = mulberry32(hashStr(S.seedKey + '#bw' + f.n + '#' + bs.drains));
+        for (var qi = 0; qi < CFG.BOSS_BAGS; qi++) f.pickups.push(mkPickup(bs.y - 780 + qi * 150, brnd, 'bag'));
+        floatText(shaftCx(bs.y), bs.y - 640, '它把水吐回来了', '#7fb6d9');
+      }
+    }
+  }
+
   /* ===================== 物理 ===================== */
   function stepOnce(dt) {
     if (S.over) return;
@@ -925,6 +1005,40 @@
         }
       }
 
+      /* 井底 Boss 漫堤鱼：阶段一＝游动的嘴＋水柱；阶段二＝吸水把玩家赶出射程，退水才准打 */
+      if (f.boss && f.boss.alive) {
+        var bs2 = f.boss;
+        bs2.mouthCx = shaftCx(bs2.y) + Math.sin(S.animT * CFG.BOSS_SWAY_SPD) * CFG.BOSS_SWAY;
+        bs2.t += dt;
+        var bcyc = bs2.open ? CFG.BOSS_OPEN_T : CFG.BOSS_CLOSE_T;
+        if (bs2.phase >= 3) bcyc = bs2.open ? 1.15 : 0.85;   // 末期它喘：窗口反而变长，收尾要奖励玩家
+        if (bs2.t > bcyc) {
+          bs2.t = 0;
+          bs2.open = !bs2.open;
+          if (!bs2.open) {
+            if (Math.abs(P.x - bs2.mouthCx) < CFG.BOSS_MOUTH_W * 0.5 &&
+                P.y + P.r > bs2.y - 40 && P.y < bs2.y + 12 && !wallGrace()) hurt('被漫堤鱼闷了一口', true);
+          } else if (bs2.wstate !== 'hold') {
+            bossSpit(bs2, f, bs2.phase >= 2 ? 4 : 3);
+          }
+        }
+        bs2.openness += ((bs2.open ? 1 : 0) - bs2.openness) * Math.min(1, 9 * dt);
+        if (bs2.phase === 1 && bs2.hp <= bs2.maxHp * CFG.BOSS_PHASE2) {
+          bs2.phase = 2; bs2.wstate = 'warn'; bs2.wt = 0;
+          floatText(shaftCx(bs2.y), bs2.y - 560, '它在吸水！', '#7fb6d9');
+        }
+        if (bs2.phase === 2 && bs2.hp <= bs2.maxHp * CFG.BOSS_PHASE3) {
+          bs2.phase = 3; bs2.wstate = 'idle'; S.waterOn = false;
+          floatText(shaftCx(bs2.y), bs2.y - 560, '它没力气了', '#e8b23a');
+        }
+        bossWater(bs2, f, dt);
+        /* 它的背是平台：活着就落不到井底＝不会提前通关 */
+        if (P.vy >= 0 && prevBottom <= bs2.y - 6 && P.y + P.r >= bs2.y - 8) {
+          P.y = bs2.y - 8 - P.r;
+          P.vy = 0;
+        }
+      }
+
       /* 蛙喷的石子：抛物线弹幕，碰玩家扣血（gameplay，无头模拟也跑） */
       if (f.stones && f.stones.length) {
         for (var sti2 = f.stones.length - 1; sti2 >= 0; sti2--) {
@@ -974,6 +1088,12 @@
       var bu = S.bullets[bi];
       if (!bu.live) continue;
       bu.y += (bu.sp || CFG.SEED_SPEED) * bu.dirY * dt;
+      /* 籽入水即碎：水挡在中间时"打不到"必须看得见（Boss 涨水期的核心读招） */
+      if (S.waterOn && bu.dirY > 0 && bu.y > S.waterY) {
+        burst(bu.x, S.waterY, 3, '#7fb6d9', 90);
+        bu.live = false;
+        continue;
+      }
       /* 追风籽：下方 CFG.WIND_R 内最近住户，明显转向牵引（m4l 前是 48px 微偏，看不见） */
       if (lvl('wind') > 0) {
         var bestDy = CFG.WIND_R, tgt = null;
@@ -1108,6 +1228,39 @@
         floatText(bu.x, bu.y - 10, '闭嘴', '#cfd6e2');
         continue;
       }
+      /* 井底 Boss：弱点＝游动的嘴心；吃完整伤害加成（蛙那套固定 -1 让攻击卡在蛙层白买，这里不重复） */
+      if (bf.boss && bf.boss.alive && bf.boss.open && bf.boss.openness > 0.5) {
+        var bmY = bf.boss.y - 40;
+        if (Math.abs(bu.y - bmY) < 34 &&
+            Math.abs(bu.x - bf.boss.mouthCx) < CFG.BOSS_MOUTH_W * 0.5 * (1 + 0.2 * lvl('eye') + lineBonus('aim'))) {
+          bu.live = false;
+          bf.boss.hp -= bu.dmg;
+          bf.boss.hitT = S.animT;
+          floatText(bu.x, bmY - 24, '-' + bu.dmg, '#e8b23a');
+          onWeakHit();
+          burst(bu.x, bmY - 10, 5, '#7fb6d9', 160);
+          if (bf.boss.hp <= 0) {
+            bf.boss.hp = 0;
+            bf.boss.alive = false;
+            bf.boss.dieT = S.animT;
+            S.bossKilled = true;
+            S.waterOn = false;
+            S.shake = 0.5;
+            S.slowmo = 0.7;
+            S.flashT = 0.2;
+            burst(bf.boss.mouthCx, bf.boss.y, 20, '#7fb6d9', 320);
+            screamCall('kill');
+          }
+          continue;
+        }
+      } else if (bf.boss && bf.boss.alive &&
+          Math.abs(bu.y - (bf.boss.y - 40)) < 34 &&
+          Math.abs(bu.x - bf.boss.mouthCx) < CFG.BOSS_MOUTH_W * 0.5) {
+        bu.live = false;
+        burst(bu.x, bu.y, 2, '#cfd6e2', 70);
+        floatText(bu.x, bu.y - 10, '闭嘴', '#cfd6e2');
+        continue;
+      }
       if (bf.fish && bf.fish.alive) {
         var fdx = bu.x - bf.fish.x, fdy = bu.y - bf.fish.y;
         if (Math.abs(fdx) < fishRx(bf.fish) && Math.abs(fdy) < fishRy(bf.fish) + 6) {
@@ -1154,11 +1307,16 @@
     }
 
     /* --- 潭水：碰到即死（§8 坝上潭，漫过爪子就被送回井口） --- */
+    /* 井底层的水位由 Boss 状态机接管：不自动上涨、不让停留洪水插队，但接触即死照旧 */
+    var bossF = floorAt(CFG.TOTAL_FLOORS).boss;
+    var bossAliveNow = !!(bossF && bossF.alive);
     if (!S.waterOn) {
-      P.dwell += dt;
-      if (P.dwell > CFG.FLOOR_TIMEOUT * (S.shellT > 0 ? 0.5 : 1)) triggerFlood();
+      if (!bossAliveNow) {
+        P.dwell += dt;
+        if (P.dwell > CFG.FLOOR_TIMEOUT * (S.shellT > 0 ? 0.5 : 1)) triggerFlood();
+      }
     } else {
-      S.waterY -= CFG.WATER_SPEED * dt;
+      if (!bossAliveNow) S.waterY -= CFG.WATER_SPEED * dt;
       if (P.y + P.r > S.waterY && !S.godMode) {
         if (P.mods.shell && !P.shellUsed) {
           P.shellUsed = true; S.shellT = 2; S.waterY += 600; P.invuln = 2;
@@ -1189,12 +1347,18 @@
       }
     }
 
-    /* --- 井底 --- */
+    /* --- 井底：Boss 活着时它把你托住，落不进暗河＝不会提前通关 --- */
     if (P.y >= CFG.FLOOR_H * CFG.TOTAL_FLOORS - 40) {
-      S.over = true; S.win = true; S.firing = false;
-      S.finalDeepest = P.deepest;
-      recordRun(P.deepest);
-      showResult();
+      if (bossAliveNow) {
+        P.y = CFG.FLOOR_H * CFG.TOTAL_FLOORS - 41;
+        P.vy = 0;
+      } else {
+        S.over = true; S.win = true; S.firing = false;
+        S.finalDeepest = P.deepest;
+        recordRun(P.deepest);
+        screamCall('win');
+        showResult();
+      }
     }
   }
 
@@ -1363,6 +1527,18 @@
           ctx.beginPath();
           ctx.arc(f.stones[sti3].x, f.stones[sti3].y, 10, 0, Math.PI * 2);
           ctx.fill();
+        }
+      }
+      /* 井底 Boss：水柱沿用 stones 弹道，但画成水色，与蛙的石子区分 */
+      if (f.boss) {
+        drawBoss(f.boss);
+        if (f.stones.length) {
+          ctx.fillStyle = 'rgba(159,216,239,0.85)';
+          for (var bji = 0; bji < f.stones.length; bji++) {
+            ctx.beginPath();
+            ctx.arc(f.stones[bji].x, f.stones[bji].y, 11, 0, Math.PI * 2);
+            ctx.fill();
+          }
         }
       }
       for (var i = 0; i < f.pickups.length; i++) {
@@ -1722,6 +1898,69 @@
     ctx.fillRect(cx - mw + 4, fg.y - 6 - mh * 0.5, mw * 2 - 8, Math.max(2, mh - 4));
     ctx.restore();
     drawFrogFx(fg, cx);
+  }
+
+  /* ===================== m4o 井底 Boss 绘制 ===================== */
+  function drawBoss(bs) {
+    var l = shaftL(bs.y), r = shaftR(bs.y);
+    var bodyH = 92, alive = bs.alive;
+    var sink = 0, alpha = 1;
+    if (!alive) {
+      var age0 = S.animT - (bs.dieT === undefined ? -9 : bs.dieT);
+      if (age0 > 1.4) return;
+      sink = age0 * age0 * 620;
+      alpha = Math.max(0, 1 - age0 / 1.3);
+    }
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(0, sink);
+    ctx.fillStyle = '#2f4a5c';
+    ctx.fillRect(l, bs.y - 10, r - l, bodyH);
+    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+    ctx.fillRect(l, bs.y + bodyH - 34, r - l, 22);
+    ctx.fillStyle = '#3c5f74';
+    for (var tf = 0; tf < 3; tf++) ctx.fillRect(l + 6, bs.y + 4 + tf * 22, 26, 12);
+    /* 眼睛与嘴一起随 mouthCx 游：让玩家看见"对准线在走" */
+    ctx.fillStyle = '#e8d9a8';
+    ctx.beginPath(); ctx.arc(bs.mouthCx - 48, bs.y - 16, 9, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(bs.mouthCx + 48, bs.y - 16, 9, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#16242c';
+    ctx.beginPath(); ctx.arc(bs.mouthCx - 48, bs.y - 16, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(bs.mouthCx + 48, bs.y - 16, 4, 0, Math.PI * 2); ctx.fill();
+    var mw = CFG.BOSS_MOUTH_W * 0.5;
+    var mh = 6 + bs.openness * 34;
+    ctx.fillStyle = '#16242c';
+    ctx.fillRect(bs.mouthCx - mw, bs.y - 12 - mh * 0.5, mw * 2, mh + 10);
+    ctx.fillStyle = bs.open ? '#d9534f' : '#4a6472';
+    ctx.fillRect(bs.mouthCx - mw + 5, bs.y - 10 - mh * 0.5, mw * 2 - 10, Math.max(2, mh - 6));
+    var ageb = S.animT - (bs.hitT === undefined ? -9 : bs.hitT);
+    if (ageb < 0.1) {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = alpha * (0.1 - ageb) * 3;
+      ctx.fillStyle = '#9fd8ef';
+      ctx.fillRect(l, bs.y - 10, r - l, bodyH);
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    ctx.restore();
+    drawBossBar(bs);
+  }
+
+  function drawBossBar(bs) {
+    if (!bs.alive) return;
+    var bw = Math.min(300, CFG.LOGICAL_W - 80);
+    var bx = (CFG.LOGICAL_W - bw) * 0.5, byy = 96;
+    ctx.fillStyle = 'rgba(10,14,18,0.62)';
+    ctx.fillRect(bx - 3, byy - 3, bw + 6, 20);
+    ctx.fillStyle = '#28414f';
+    ctx.fillRect(bx, byy, bw, 14);
+    ctx.fillStyle = bs.phase >= 3 ? '#d9534f' : (bs.phase === 2 ? '#e8b23a' : '#8fb6c9');
+    ctx.fillRect(bx, byy, bw * Math.max(0, bs.hp / bs.maxHp), 14);
+    ctx.fillStyle = '#cfd6e2';
+    ctx.font = '800 13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(bs.phase === 2 ? '漫堤鱼 · 它在吸水' : (bs.phase >= 3 ? '漫堤鱼 · 它没力气了' : '漫堤鱼 · 暗河'),
+      CFG.LOGICAL_W * 0.5, byy - 8);
+    ctx.textAlign = 'left';
   }
 
   function drawPickup(pk) {
@@ -2139,14 +2378,18 @@
   function showResult() {
     var secs = S.runT;
     var mm = Math.floor(secs / 60), ss = Math.floor(secs % 60);
-    elResTitle.textContent = S.win ? '落进暗河，被鱼喷出井口' : (CAUSE_TEXT[S.cause] || '被水冲回井口了');
+    elResTitle.textContent = S.win ? '你把暗河的那条打穿了' : (CAUSE_TEXT[S.cause] || '被水冲回井口了');
     elResDepth.textContent = S.win ? '通到井底' : ('第 ' + P.deepest + ' 层');
+    var bEnd = floorAt(CFG.TOTAL_FLOORS).boss;
+    var bLine = (bEnd && bEnd.hp < bEnd.maxHp)
+      ? '\n漫堤鱼 ' + bEnd.hp + '/' + bEnd.maxHp + ' · 第 ' + bEnd.phase + ' 阶段' + (bEnd.alive ? '' : ' · 已打穿')
+      : '';
     var meta = '用时 ' + mm + ':' + (ss < 10 ? '0' : '') + ss +
       ' · 射出 ' + S.shots + ' 颗籽' +
       ' · 破障 ' + S.brokeBlocks +
       ' · 挨 ' + S.hitsTaken + ' 下' +
       '\n' + tierName(gTier) + '（' + tierMaxHp() + ' 血）' +
-      ' · 井宽在最深处 ' + Math.round(shaftW(P.deepest * CFG.FLOOR_H)) + 'px' +
+      ' · 井宽在最深处 ' + Math.round(shaftW(P.deepest * CFG.FLOOR_H)) + 'px' + bLine +
       '\n纪录 ' + gSave.deepest + ' 层 · 今日第 ' + gSave.todayTries + ' 次 · 累计 ' + gSave.totalRuns + ' 局';
     elResMeta.textContent = meta;
     elHint.textContent = gTier === 1
@@ -2573,6 +2816,12 @@
         }
         /* god 只对几何障碍开火（坝/蛙嘴），不陪鱼虫耗弹药——可解性探针语义（m3y） */
         if (f.frog && f.frog.alive && f.frog.open && Math.abs(P.x - shaftCx(f.frog.y)) < 70) wantFire = true;   // m3y：对准嘴才开火，省弹药
+        /* m4o 井底 Boss：张嘴才输出；水挡在嘴边或追上脚底时改为连续开火逃命（开火＝唯一升力） */
+        if (f.boss && f.boss.alive) {
+          var bMouthY = f.boss.y - 40;
+          if ((S.waterOn && (S.waterY < bMouthY || P.y + P.r > S.waterY - 300)) ||
+              (!S.waterOn && f.boss.open && f.boss.openness > 0.6)) wantFire = true;
+        }
       }
       /* m3y：参考 bot 走位——蛙在下方朝嘴心对齐；弹药紧张时朝最近拾取横移（仅模拟器） */
       S.steerL = false;
@@ -2598,6 +2847,12 @@
           }
         }
         if (bq) { S.steerL = P.x > bq.x + 10; S.steerR = P.x < bq.x - 10; }
+      }
+      /* m4o：井底 Boss 战优先朝它游动的嘴心对齐（蛙与拾取那套走位此时让位） */
+      var bA = floorAt(CFG.TOTAL_FLOORS).boss;
+      if (bA && bA.alive && P.floor >= CFG.TOTAL_FLOORS - 1) {
+        S.steerL = P.x > bA.mouthCx + 16;
+        S.steerR = P.x < bA.mouthCx - 16;
       }
       S.firing = wantFire;
       stepOnce(CFG.STEP);
