@@ -30,8 +30,9 @@
     RECOIL_VY: -430,        // 赋值式，不是叠加（叠加会无限上冲）
     FIRE_CD: 0.12,
 
-    AMMO_START: 20,
-    AMMO_MAX: 30,
+    AMMO_START: 40,
+    AMMO_MAX: 40,
+    RELOAD_PER_FLOOR: 12,   // m4f 换层补给：子弹兼"杀敌+位移滞空"双开销，每往下进一层压入此数（仅下行，防上下蹦层刷弹）
     TIER_HP: [3, 2, 1],     // 血量档：1=3血(新手) 2=2血(标准) 3=1血(进阶)，血量即难度
     INVULN: 1.2,
     FLOOR_TIMEOUT: 30,
@@ -297,7 +298,7 @@
   }
 
   /* ===================== 状态 ===================== */
-  var VER = 'm4e';
+  var VER = 'm4f';
   var S = null;
   var P = null;
   var gTier = 3;   // 血量档：1=3血(新手) 2=2血(标准) 3=1血(进阶)；本版默认 1 血交付手感
@@ -572,7 +573,6 @@
     P.fireCd = CFG.FIRE_CD / (1 + 0.3 * lvl('rate') + (linePerk('volley') ? 0.2 : 0));
     S.shots++;
     if (P.ammo === 0 && S.ammoOutT < 0) S.ammoOutT = S.runT;
-    if (P.ammo === 0) S.rescuePending = true;   // m4a：空弹救济——下一层必出一个补给袋
     var sp = lvl('split');
     if (linePerk('volley') && sp < 2) sp = 2;   // 弹幕大成：分裂视为满级
     var n = 1 + sp * 2;
@@ -1048,16 +1048,14 @@
     P.floor = nf;
     if (nf > P.deepest) P.deepest = nf;
     if (nf !== S.lastFloor) {
+      var deeper = nf > S.lastFloor;
       S.lastFloor = nf;
       P.dwell = 0;
       if (S.loanT > 0) S.loanT--;
       if (S.shellT > 0) S.shellT--;
+      /* m4f 换层补给：子弹兼"杀敌+位移滞空"双开销，每往下进一层压入一发量（上行不给，防蹦层刷弹） */
+      if (deeper) P.ammo = Math.min(ammoCap(), P.ammo + CFG.RELOAD_PER_FLOOR);
       if (linePerk('econ') && nf % 25 === 0) P.ammo = ammoCap();   // 经济大成：每 25 层回满
-      /* m4a 空弹救济：弹尽后踏入的新层必出一个袋 */
-      if (S.rescuePending && P.ammo === 0) {
-        S.rescuePending = false;
-        floorAt(nf).pickups.push(mkPickup(P.y + 520, mulberry32(hashStr(S.seedKey + '#res' + nf)), 'bag'));
-      }
       if (nf % 10 === 0 && P.mods.seedbag) P.ammo = ammoCap();
       if (!S.pick3 && nf > S.lastPick3Floor && nf % 10 === 0 && nf < CFG.TOTAL_FLOORS) {
         S.lastPick3Floor = nf;
@@ -2387,6 +2385,8 @@
 
     var t = 0, lastT = 0, lastFloor = P.floor;
     var floorTimes = [];
+    /* m4f 弹药遥测：子弹兼"杀敌+位移"双开销，量化进层结余/层内谷底/空仓时长（纯数字，循环内零分配） */
+    var amTrans = 0, amEntrySum = 0, amEntryMin = 999, amValleySum = 0, amValleyMin = 999, amEmptySteps = 0, amValley = P.ammo;
     while (t < budget && !S.over) {
       var wantFire = false;
       if (policy === 'greedy' || policy === 'noPick') {
@@ -2447,10 +2447,18 @@
       var target = P.y - VIEW.h * CFG.CAM_ANCHOR;
       S.camY += (target - S.camY) * Math.min(1, CFG.CAM_SMOOTH * CFG.STEP);
       t += CFG.STEP;
+      if (P.ammo === 0) amEmptySteps++;
+      if (P.ammo < amValley) amValley = P.ammo;
       if (P.floor !== lastFloor) {
         floorTimes.push(t - lastT);
         lastFloor = P.floor;
         lastT = t;
+        amTrans++;
+        amEntrySum += P.ammo;
+        amValleySum += amValley;
+        if (P.ammo < amEntryMin) amEntryMin = P.ammo;
+        if (amValley < amValleyMin) amValleyMin = amValley;
+        amValley = P.ammo;
       }
     }
 
@@ -2471,6 +2479,14 @@
       blocksBroken: S.brokeBlocks,
       hits: S.hitsTaken,
       ammoLeft: P.ammo,
+      ammoStats: amTrans ? {
+        floors: amTrans,
+        avgEntry: Math.round(amEntrySum / amTrans * 10) / 10,
+        minEntry: amEntryMin,
+        avgValley: Math.round(amValleySum / amTrans * 10) / 10,
+        minValley: amValleyMin,
+        emptyPct: Math.round(amEmptySteps / (t / CFG.STEP) * 1000) / 10
+      } : null,
       waterTriggered: S.waterOn,
       xTravel: Math.round(xMax - xMin),
       shaftWAtDeepest: Math.round(shaftW(P.deepest * CFG.FLOOR_H)),
@@ -2508,7 +2524,8 @@
       var m = tiers[mi];
       var agg = {
         tier: m, runs: 0, deepestSum: 0, spikeHits: 0, spiderHits: 0, waterHits: 0,
-        deaths: {}, waterTriggers: 0, xTravelSum: 0, shotsSum: 0, timeSum: 0, floorsSum: 0
+        deaths: {}, waterTriggers: 0, xTravelSum: 0, shotsSum: 0, timeSum: 0, floorsSum: 0,
+        amEntrySum: 0, amValleySum: 0, amEmptySum: 0, ammoWorstValley: 999, ammoWorstEntry: 999
       };
       for (var r = 0; r < n; r++) {
         var res = simulate(opts.seconds || 200, {
@@ -2529,17 +2546,30 @@
         agg.waterHits += res.hitsByCause['被潭水漫过'] || 0;
         var c = res.cause || '(未死)';
         agg.deaths[c] = (agg.deaths[c] || 0) + 1;
+        if (res.ammoStats) {
+          agg.amEntrySum += res.ammoStats.avgEntry;
+          agg.amValleySum += res.ammoStats.avgValley;
+          agg.amEmptySum += res.ammoStats.emptyPct;
+          if (res.ammoStats.minValley < agg.ammoWorstValley) agg.ammoWorstValley = res.ammoStats.minValley;
+          if (res.ammoStats.minEntry < agg.ammoWorstEntry) agg.ammoWorstEntry = res.ammoStats.minEntry;
+        }
       }
       agg.avgDeepest = Math.round(agg.deepestSum / agg.runs * 10) / 10;
       agg.avgXTravel = Math.round(agg.xTravelSum / agg.runs);
       agg.avgShots = Math.round(agg.shotsSum / agg.runs);
       agg.avgSeconds = Math.round(agg.timeSum / agg.runs);
       agg.avgSecPerFloor = agg.floorsSum ? Math.round(agg.timeSum / agg.floorsSum * 100) / 100 : 0;
+      agg.ammoEntryAvg = Math.round(agg.amEntrySum / agg.runs * 10) / 10;
+      agg.ammoValleyAvg = Math.round(agg.amValleySum / agg.runs * 10) / 10;
+      agg.ammoEmptyPct = Math.round(agg.amEmptySum / agg.runs * 10) / 10;
       delete agg.deepestSum;
       delete agg.xTravelSum;
       delete agg.shotsSum;
       delete agg.timeSum;
       delete agg.floorsSum;
+      delete agg.amEntrySum;
+      delete agg.amValleySum;
+      delete agg.amEmptySum;
       out.push(agg);
     }
     return out;
