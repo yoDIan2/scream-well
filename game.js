@@ -177,7 +177,7 @@
 
   /* ===================== M2 构筑：改装池（§9 全 10 项）+ 遗物（§9 全 8 件） ===================== */
   var MODS = [
-    { id: 'split',   name: '分裂壳', max: 2, line: 'volley', tier: 1, desc: '出膛一分为三',  desc2: '再分，共五份' },
+    { id: 'split',   name: '分裂壳', max: 2, line: 'volley', tier: 2, desc: '出膛一分为三',  desc2: '再分，共五份' },
     { id: 'bounce',  name: '跳弹簧', max: 2, line: 'volley', tier: 1, desc: '籽被收窄的井壁弹回井心', desc2: '可弹两次' },
     { id: 'rate',    name: '连发嗑', max: 2, line: 'volley', tier: 1, desc: '射速 +30%',     desc2: '射速再 +30%' },
     { id: 'hard',    name: '硬壳籽', max: 2, line: 'volley', tier: 1, desc: '籽伤害 +1',     desc2: '伤害再 +1' },
@@ -362,7 +362,7 @@
   }
 
   /* ===================== 状态 ===================== */
-  var VER = 'm54';
+  var VER = 'm55';
   var S = null;
   var P = null;
   var gTier = 3;   // 血量档：1=3血(简单) 2=2血(标准) 3=1血(困难)；本版默认 1 血交付手感
