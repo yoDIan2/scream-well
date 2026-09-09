@@ -343,7 +343,7 @@
   }
 
   /* ===================== 状态 ===================== */
-  var VER = 'm4w';
+  var VER = 'm4x';
   var S = null;
   var P = null;
   var gTier = 3;   // 血量档：1=3血(简单) 2=2血(标准) 3=1血(困难)；本版默认 1 血交付手感
@@ -2145,18 +2145,18 @@
   function drawHud() {
     /* 心 */
     for (var i = 0; i < tierMaxHp(); i++) {
-      var hx = 24 + i * 32, hy = 34, aliveHeart = i < P.hp;
-      ctx.lineWidth = 2;
+      var hx = 26 + i * 40, hy = 38, aliveHeart = i < P.hp;
+      ctx.lineWidth = 2.5;
       if (aliveHeart) {
         ctx.fillStyle = '#e0554f';
-        heartPath(hx, hy, 11); ctx.fill();
+        heartPath(hx, hy, 14); ctx.fill();
         ctx.strokeStyle = 'rgba(90,20,18,0.75)';
-        heartPath(hx, hy, 11); ctx.stroke();
+        heartPath(hx, hy, 14); ctx.stroke();
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.beginPath(); ctx.arc(hx - 4.2, hy - 3.4, 2.4, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(hx - 5.4, hy - 4.4, 3.2, 0, Math.PI * 2); ctx.fill();
       } else {
         ctx.strokeStyle = 'rgba(242,234,216,0.3)';
-        heartPath(hx, hy, 11); ctx.stroke();
+        heartPath(hx, hy, 14); ctx.stroke();
       }
     }
     /* 凝视窗口读数：让光环有名字 */
@@ -2198,21 +2198,21 @@
       ctx.fillText('颊囊空了！', CFG.LOGICAL_W - 150, ay + 4);
     }
     /* 下落速度表：硬着陆是"看不见的红线"，先把速度本身给出来（阈值怎么算等 D4 定） */
-    var ggW = 122, ggH = 9, ggX = CFG.LOGICAL_W - 20 - ggW, ggY = VIEW.h - 44;
+    var ggW = 158, ggH = 14, ggX = CFG.LOGICAL_W - 20 - ggW, ggY = VIEW.h - 54;
     var ggDanger = CFG.T_HARDLAND ? CFG.HARD_LAND_SPEED : 1e9;
     var ggV = P.vy > 0 ? P.vy : 0;
-    ctx.fillStyle = 'rgba(255,255,255,0.14)';
+    ctx.fillStyle = 'rgba(255,255,255,0.16)';
     ctx.fillRect(ggX, ggY, ggW, ggH);
     ctx.fillStyle = P.vy >= ggDanger ? '#ff5b52' : (P.vy > ggDanger * 0.72 ? '#e8b23a' : '#8fb6c9');
     ctx.fillRect(ggX, ggY, ggW * Math.min(1, ggV / ggDanger), ggH);
-    ctx.strokeStyle = 'rgba(0,0,0,0.4)';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+    ctx.lineWidth = 1.5;
     ctx.strokeRect(ggX + 0.5, ggY + 0.5, ggW - 1, ggH - 1);
-    ctx.font = '700 12px sans-serif';
+    ctx.font = '800 15px sans-serif';
     ctx.textAlign = 'right';
-    ctx.fillStyle = P.vy >= ggDanger ? '#ff5b52' : 'rgba(242,234,216,0.72)';
+    ctx.fillStyle = P.vy >= ggDanger ? '#ff5b52' : 'rgba(242,234,216,0.82)';
     ctx.fillText(P.vy > 0 ? ('下落 ' + Math.round(P.vy) + (P.vy >= ggDanger ? ' 会摔伤' : '')) : '上升',
-      CFG.LOGICAL_W - 20, ggY - 7);
+      CFG.LOGICAL_W - 20, ggY - 8);
     ctx.textAlign = 'left';
     /* Boss 血条：从它上面一层就开始显示，否则玩家看不见这条血存在＝打不掉血的错觉 */
     var hudBoss = floorAt(CFG.TOTAL_FLOORS).boss;
