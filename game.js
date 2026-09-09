@@ -343,7 +343,7 @@
   }
 
   /* ===================== 状态 ===================== */
-  var VER = 'm4u';
+  var VER = 'm4v';
   var S = null;
   var P = null;
   var gTier = 3;   // 血量档：1=3血(简单) 2=2血(标准) 3=1血(困难)；本版默认 1 血交付手感
@@ -1281,6 +1281,7 @@
             S.flashT = 0.2;
             burst(bf.boss.mouthCx, bf.boss.y, 20, '#7fb6d9', 320);
             screamCall('kill');
+            winRun();   // 打死即通关，不再要求玩家掉进暗河才触发
           }
           continue;
         }
@@ -1346,16 +1347,18 @@
     }
 
     /* --- 潭水：碰到即死（§8 坝上潭，漫过爪子就被送回井口） --- */
-    /* 井底层的水位由 Boss 状态机接管：不自动上涨、不让停留洪水插队，但接触即死照旧 */
     var bossF = floorAt(CFG.TOTAL_FLOORS).boss;
     var bossAliveNow = !!(bossF && bossF.alive);
+    /* 只有"玩家就在井底、且 Boss 活着"时才把水位交给 Boss 状态机。
+       原来写成全局判断＝Boss 存活期间整口井的防卡死水钟都被关掉（m4v 修） */
+    var bossHere = bossAliveNow && floorOf(P.y) >= CFG.TOTAL_FLOORS;
     if (!S.waterOn) {
-      if (!bossAliveNow) {
+      if (!bossHere) {
         P.dwell += dt;
         if (P.dwell > CFG.FLOOR_TIMEOUT * (S.shellT > 0 ? 0.5 : 1)) triggerFlood();
       }
     } else {
-      if (!bossAliveNow) S.waterY -= CFG.WATER_SPEED * dt;
+      if (!bossHere) S.waterY -= CFG.WATER_SPEED * dt;
       if (P.y + P.r > S.waterY && !S.godMode) {
         if (P.mods.shell && !P.shellUsed) {
           P.shellUsed = true; S.shellT = 2; S.waterY += 600; P.invuln = 2;
@@ -1386,19 +1389,25 @@
       }
     }
 
-    /* --- 井底：Boss 活着时它把你托住，落不进暗河＝不会提前通关 --- */
+    /* --- 井底兜底：万一玩家绕过 Boss 落进暗河，也算通关（正常路径是打死它即时结算） --- */
     if (P.y >= CFG.FLOOR_H * CFG.TOTAL_FLOORS - 40) {
       if (bossAliveNow) {
         P.y = CFG.FLOOR_H * CFG.TOTAL_FLOORS - 41;
         P.vy = 0;
-      } else {
-        S.over = true; S.win = true; S.firing = false;
-        S.finalDeepest = P.deepest;
-        recordRun(P.deepest);
-        screamCall('win');
-        showResult();
+      } else if (!S.over) {
+        winRun();
       }
     }
+  }
+
+  /* 通关收束：打死 Boss 的瞬间就走这里，不再要求玩家掉进暗河 */
+  function winRun() {
+    if (S.over) return;
+    S.over = true; S.win = true; S.firing = false;
+    S.finalDeepest = P.deepest;
+    recordRun(P.deepest);
+    screamCall('win');
+    showResult();
   }
 
   function triggerFlood() {
