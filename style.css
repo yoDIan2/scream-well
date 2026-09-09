@@ -314,6 +314,8 @@ html, body {
   will-change: transform;
   background: linear-gradient(180deg, rgba(6, 7, 10, 0.34) 0%, rgba(6, 7, 10, 0.74) 40%, rgba(4, 5, 8, 0.96) 100%);
   padding: 20px 22px 16px;
+  padding-top: 20px;
+  padding-bottom: 16px;
   padding-top: calc(20px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
   padding-bottom: calc(16px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
 }
@@ -479,6 +481,8 @@ html, body {
 }
 
 #btn-pause {
+  top: 14px;
+  right: 14px;
   top: calc(14px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
   right: calc(14px + var(--safe-area-inset-right, env(safe-area-inset-right, 0px)));
 }
