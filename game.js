@@ -362,7 +362,7 @@
   }
 
   /* ===================== 状态 ===================== */
-  var VER = 'm53';
+  var VER = 'm54';
   var S = null;
   var P = null;
   var gTier = 3;   // 血量档：1=3血(简单) 2=2血(标准) 3=1血(困难)；本版默认 1 血交付手感
@@ -2178,42 +2178,36 @@
 
   /* ===================== 素材 ===================== */
   var IMG = { jiao: null, big: null, spider: null, bug: null, frog: null, boss: null, bossGorged: null, spike: null, block: null, wall: [null, null, null, null] };
+  var IMG_WAIT = 0, IMG_FAIL = 0, IMG_TOTAL = 13;
+
+  /* D3 兜底：真机首开偶发某张图解不出来（并发解码 + 内存压力），一次 onerror 就永久退回
+     占位色块的话，整口井会变成一堆方块——比贴图晚到几帧严重得多。所以退避重试，
+     晚到的那张下一帧自然生效（绘制侧本来就是"有贴图用贴图，没有用占位"）。 */
+  function loadImg(slot, key, url, tries) {
+    IMG_WAIT++;
+    var im = new Image();
+    im.onload = function () {
+      slot[key] = im;
+      IMG_WAIT--;
+    };
+    im.onerror = function () {
+      if (tries > 0) setTimeout(function () { loadImg(slot, key, url, tries - 1); }, 260);
+      else { IMG_FAIL++; IMG_WAIT--; }
+    };
+    im.src = url;
+  }
 
   function loadImages() {
-    var a = new Image();
-    a.onload = function () { IMG.jiao = a; };
-    a.src = './assets/jiao-game.png';
-    var b = new Image();
-    b.onload = function () { IMG.big = b; };
-    b.src = './assets/jiao-big.png';
-    var c = new Image();
-    c.onload = function () { IMG.spider = c; };
-    c.src = './assets/tenant-spider.png';
-    var d = new Image();
-    d.onload = function () { IMG.bug = d; };
-    d.src = './assets/tenant-glowbug.png';
-    var e = new Image();
-    e.onload = function () { IMG.frog = e; };
-    e.src = './assets/tenant-frog.png';
-    var bf = new Image();
-    bf.onload = function () { IMG.boss = bf; };
-    bf.src = './assets/boss-fish.png';
-    var bg2 = new Image();
-    bg2.onload = function () { IMG.bossGorged = bg2; };
-    bg2.src = './assets/boss-fish-gorged.png';
-    var f = new Image();
-    f.onload = function () { IMG.spike = f; };
-    f.src = './assets/spike.png';
-    var g = new Image();
-    g.onload = function () { IMG.block = g; };
-    g.src = './assets/block.png';
-    for (var wi = 0; wi < 4; wi++) {
-      (function (idx) {
-        var im = new Image();
-        im.onload = function () { IMG.wall[idx] = im; };
-        im.src = './assets/wall-' + (idx + 1) + '.png';
-      })(wi);
-    }
+    loadImg(IMG, 'jiao', './assets/jiao-game.webp', 3);
+    loadImg(IMG, 'big', './assets/jiao-big.webp', 3);
+    loadImg(IMG, 'spider', './assets/tenant-spider.webp', 3);
+    loadImg(IMG, 'bug', './assets/tenant-glowbug.webp', 3);
+    loadImg(IMG, 'frog', './assets/tenant-frog.webp', 3);
+    loadImg(IMG, 'boss', './assets/boss-fish.webp', 3);
+    loadImg(IMG, 'bossGorged', './assets/boss-fish-gorged.webp', 3);
+    loadImg(IMG, 'spike', './assets/spike.webp', 3);
+    loadImg(IMG, 'block', './assets/block.webp', 3);
+    for (var wi = 0; wi < 4; wi++) loadImg(IMG.wall, wi, './assets/wall-' + (wi + 1) + '.webp', 3);
   }
 
   /* 井壁 pattern 缓存（repeat，随世界坐标滚动） */
@@ -2399,6 +2393,7 @@
       'seed ' + S.seedKey,
       '血档 ' + gTier + (gTier === 1 ? ' 3血' : (gTier === 2 ? ' 2血' : ' 1血')),
       '实体 弹' + ents + ' 粒' + countLive(S.particles),
+      '素材 ' + (IMG_TOTAL - IMG_WAIT) + '/' + IMG_TOTAL + ' 弃' + IMG_FAIL,
       'vy ' + P.vy.toFixed(0) + ' vx ' + P.vx.toFixed(0),
       '摔伤线' + Math.round(hardLandLine()) + ' 上限' + Math.round(fallCapBase()) + ' 起' + firstLethalFloor() + '层',
       'x ' + P.x.toFixed(0) + ' 层' + P.floor + ' 最深' + P.deepest,
