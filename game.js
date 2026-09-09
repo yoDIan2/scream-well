@@ -117,11 +117,13 @@
     BOSS_PHASE2: 0.66,       // 血量降到此比例开始吸水
     BOSS_PHASE3: 0.33,       // 再降到此比例就只喷不吸（第二轮收尾）
     BOSS_FILL: 650,          // 水线停在 boss 上方 650px：>籽的 400px 射程 ⇒ 物理上打不到
-    BOSS_RISE_T: 4,          // 涨水 4 秒
-    BOSS_HOLD_T: 6,          // 停位 6 秒：纯躲+点射维持高度，这段时间是消耗
+    BOSS_RISE_T: 7,          // 涨水 7 秒：水速必须低于玩家连射爬升速度 286px/s，否则涨水期必死（原 4 秒=237px/s 就是必死）
+    BOSS_HOLD_T: 2.5,        // 停位 2.5 秒：悬停要 5.6 发/秒，原来 6 秒＝33 发，比一轮输出收益还贵
     BOSS_DRAIN_T: 1.5,       // 退水 1.5 秒：看得见"窗口开了"
     BOSS_SPIT_T: 2.6,        // 喷水柱间隔
-    BOSS_BAGS: 3,            // 退水吐出 3 袋 = 24 发，抵掉爬高的弹药账
+    BOSS_BAGS: 5,            // 一轮循环总入账 5×8=40 发（不落地，直接进颊囊）
+    BOSS_PREPAY: 16,         // 其中开始吸水时预付 16 发，退水补齐 24 发——不预付就爬不出水线
+    BOSS_CYCLE_REST: 8,      // 阶段二每轮退水后隔多久再吸一口（决定一场能拿到几次补给）
 
     LAT_MAX: 340,           // 手动横向速度上限
     LAT_ACCEL: 1800,        // 按住侧的横向加速度
@@ -341,7 +343,7 @@
   }
 
   /* ===================== 状态 ===================== */
-  var VER = 'm4t';
+  var VER = 'm4u';
   var S = null;
   var P = null;
   var gTier = 3;   // 血量档：1=3血(简单) 2=2血(标准) 3=1血(困难)；本版默认 1 血交付手感
@@ -587,14 +589,11 @@
       f.boss = {
         y: by2, hp: CFG.BOSS_HP, maxHp: CFG.BOSS_HP, alive: true,
         open: true, t: 0, openness: 1, mouthCx: shaftCx(by2), hitT: -9,
-        phase: 1, sp: 0, wstate: 'idle', wt: 0, drains: 0
+        phase: 1, sp: 0, wstate: 'idle', wt: 0, drains: 0, rest: 0
       };
       f.stones = [];
-      /* 起手 3 袋：阶段一约 15 发 + 第一次涨水循环约 31 发 = 46 发，40 发撑不过去
-         （吐籽要等退水才给），所以补给必须开局就摆在层里，而不是等玩家自己挣 */
-      f.pickups.push(mkPickup(top + 200, rnd, 'bag'));
-      f.pickups.push(mkPickup(top + 460, rnd, 'bag'));
-      f.pickups.push(mkPickup(top + 700, rnd, 'bag'));
+      /* 井底不放地面补给：磁吸 150px 默认开，玩家无法选择拾取时机，满仓时等于作废。
+         补给一律由 bossWater 在退水瞬间直接入账 */
       return f;
     }
 
@@ -851,13 +850,31 @@
     burst(bs.mouthCx, bs.y - 46, 5, '#7fb6d9', 170);
   }
 
+  /* 井底补给一律直接入账，允许暂存到 1.5× 上限：
+     这层的弹药总量本来就锁死在一次关卡内，超上限储存没有跨层风险，却根治"满仓时补给作废" */
+  function giveBossAmmo(n) {
+    P.ammo = Math.min(Math.round(ammoCap() * 1.5), P.ammo + n);
+  }
+
   /* 吸水→涨→停→退。水线停在 boss 上方 BOSS_FILL 处：超过籽的 400px 射程，"打不到"是物理后果不是无敌 */
   function bossWater(bs, f, dt) {
     var riseTo = bs.y - CFG.BOSS_FILL;
-    if (bs.wstate === 'idle') return;
+    if (bs.wstate === 'idle') {
+      /* 阶段二它还在呼吸：每轮退水后歇一会儿再吸一口，补给因此是节奏性的、一场能拿到多次 */
+      if (bs.phase === 2 && bs.rest > 0) {
+        bs.rest -= dt;
+        if (bs.rest <= 0) { bs.wstate = 'warn'; bs.wt = 0; }
+      }
+      return;
+    }
     bs.wt += dt;
     if (bs.wstate === 'warn') {
-      if (bs.wt >= 0.8) { bs.wstate = 'rise'; bs.wt = 0; S.waterOn = true; }
+      if (bs.wt >= 0.8) {
+        bs.wstate = 'rise'; bs.wt = 0; S.waterOn = true;
+        /* 预付：爬出水线要 18 发，等退水再给就已经淹死了 */
+        giveBossAmmo(CFG.BOSS_PREPAY);
+        floatText(shaftCx(bs.y), bs.y - 700, '暗河先涌上来 ' + CFG.BOSS_PREPAY, '#e8b23a');
+      }
       return;
     }
     if (bs.wstate === 'rise') {
@@ -880,9 +897,11 @@
       S.waterTop = S.waterY;
       if (k2 >= 1) {
         bs.wstate = 'idle'; bs.wt = 0; bs.drains++; S.waterOn = false;
-        var brnd = mulberry32(hashStr(S.seedKey + '#bw' + f.n + '#' + bs.drains));
-        for (var qi = 0; qi < CFG.BOSS_BAGS; qi++) f.pickups.push(mkPickup(bs.y - 780 + qi * 150, brnd, 'bag'));
-        floatText(shaftCx(bs.y), bs.y - 640, '它把水吐回来了', '#7fb6d9');
+        /* 直接入账，不落地：磁吸 150px 默认开，玩家无法选择"要不要捡"，
+           地上的补给等于随机时刻被吃掉、满仓时整张作废 */
+        giveBossAmmo(CFG.BOSS_BAGS * 8 - CFG.BOSS_PREPAY);
+        bs.rest = CFG.BOSS_CYCLE_REST;
+        floatText(shaftCx(bs.y), bs.y - 640, '它把水吐回来了 +' + (CFG.BOSS_BAGS * 8 - CFG.BOSS_PREPAY), '#7fb6d9');
       }
     }
   }
@@ -2147,7 +2166,7 @@
         ctx.fillStyle = '#f0e2b6';
         ctx.fillRect(16 + b * 17, ay - 11, 11, 17);
       }
-      ctx.fillStyle = '#f0e2b6';
+      ctx.fillStyle = P.ammo > ammoCap() ? '#e8b23a' : '#f0e2b6';
       ctx.font = '800 24px sans-serif';
       ctx.fillText('× ' + P.ammo, 108, ay + 5);
     }
