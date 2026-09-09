@@ -343,7 +343,7 @@
   }
 
   /* ===================== 状态 ===================== */
-  var VER = 'm4z';
+  var VER = 'm50';
   var S = null;
   var P = null;
   var gTier = 3;   // 血量档：1=3血(简单) 2=2血(标准) 3=1血(困难)；本版默认 1 血交付手感
@@ -1562,6 +1562,9 @@
       ctx.fillText('B' + n, shaftL(ly) + 10, ly + 30);
     }
 
+    /* 井底暗河的水光（画在实体之前＝在鱼背后） */
+    drawAbyssGlow(y0, y1);
+
     /* 内容：只画可见层 */
     for (var k = fn0; k <= fn1; k++) {
       var f = floorAt(k);
@@ -1959,6 +1962,38 @@
     for (i = n; i >= 0; i--) { y = y0 + (y1 - y0) * i / n; ctx.lineTo(shaftL(y), y); }
     ctx.closePath();
     ctx.clip();
+  }
+
+  /* 井底暗河的水光：井里最后一段必须有"底下是水"的证据，否则玩家不知道自己在打一条河。
+     渐变按世界坐标建一次即可复用——相机变换只是平移，绝对坐标恒定 */
+  var abyssGrad = null;
+  function drawAbyssGlow(y0, y1) {
+    var ay = CFG.TOTAL_FLOORS * CFG.FLOOR_H + CFG.BOSS_Y_OFF;
+    if (y1 < ay - 1400) return;
+    if (!abyssGrad) {
+      abyssGrad = ctx.createLinearGradient(0, ay + 240, 0, ay - 1000);
+      abyssGrad.addColorStop(0, 'rgba(127,182,217,0.26)');
+      abyssGrad.addColorStop(0.45, 'rgba(90,150,186,0.10)');
+      abyssGrad.addColorStop(1, 'rgba(90,150,186,0)');
+    }
+    ctx.save();
+    clipShaft(ay - 1000, ay + 320);
+    ctx.fillStyle = abyssGrad;
+    ctx.fillRect(0, ay - 1000, CFG.LOGICAL_W, 1320);
+    ctx.lineWidth = 3;
+    for (var i = 0; i < 4; i++) {
+      var ph = S.animT * (0.5 + i * 0.17) + i * 1.9;
+      var wy = ay + 150 - i * 210 + Math.sin(ph) * 26;
+      var a = Math.max(0.02, 0.05 + 0.05 * Math.sin(ph * 1.7) + i * 0.012);
+      ctx.strokeStyle = 'rgba(159,216,239,' + a.toFixed(3) + ')';
+      ctx.beginPath();
+      for (var sx = 0; sx <= CFG.LOGICAL_W; sx += 30) {
+        var yy = wy + Math.sin(sx * 0.012 + ph) * 9;
+        if (sx === 0) ctx.moveTo(sx, yy); else ctx.lineTo(sx, yy);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   /* ===================== m4o 井底 Boss 绘制 ===================== */
@@ -2383,7 +2418,7 @@
     /* 死因（短版）/ 通关 */
     x.fillStyle = '#231a05';
     x.font = '700 42px sans-serif';
-    x.fillText(S.win ? '通到井底！被暗河的鱼喷了回来' : '殓于 ' + (CAUSE_SHORT[S.cause] || '不明'), W / 2, 736);
+    x.fillText(S.win ? '你把暗河那条打穿了' : '殓于 ' + (CAUSE_SHORT[S.cause] || '不明'), W / 2, 736);
 
     /* 构筑图标序列 + 共鸣标签 */
     var seq = '';
@@ -2499,7 +2534,7 @@
     if (!mt || !S.reportData) return shareFallback();
     mt.postNote({
       title: '尖叫之井｜我通到了第 ' + S.finalDeepest + ' 层',
-      content: '土拨鼠王国史·淘井日志：今天在井里通到第 ' + S.finalDeepest + ' 层，' + (S.win ? '通到井底被暗河的鱼喷了回来' : (CAUSE_TEXT[S.cause] || '被水冲回井口')) + '。掉井不是意外，是上班。',
+      content: '土拨鼠王国史·淘井日志：今天在井里通到第 ' + S.finalDeepest + ' 层，' + (S.win ? '把暗河那条打穿了' : (CAUSE_TEXT[S.cause] || '被水冲回井口')) + '。掉井不是意外，是上班。',
       pageType: 'photo_publish',
       mediaInfo: { image_resources: [{ url: S.reportData }] }
     }).then(function () {
@@ -2926,27 +2961,35 @@
     setPauseChip(true);
   }
 
-  /* 事件触发式尖叫：只在受击（未死）与死亡时出声；低调、干声、轻微毛边 */
+  /* 事件触发式尖叫：受击（未死）／漫堤鱼死／通关 三种各有音色，低调、干声、轻微毛边 */
   function screamCall(kind) {
     if (!AU.ctx || !AU.unlocked || !AU.on || S.headless) return;
     var t = AU.ctx.currentTime;
     var dying = kind === 'death';
-    var base = dying ? (430 + Math.random() * 70) : (470 + Math.random() * 90);
-    var dur = dying ? 0.55 : 0.22;
+    var killing = kind === 'kill';
+    var winning = kind === 'win';
+    /* 死＝往下砸；杀鱼＝低哑长呻吟；通关＝往上冲的尖叫 */
+    var base = dying ? (430 + Math.random() * 70)
+      : killing ? (205 + Math.random() * 40)
+      : winning ? (610 + Math.random() * 70)
+      : (470 + Math.random() * 90);
+    var dur = dying ? 0.55 : killing ? 0.72 : winning ? 0.46 : 0.22;
+    var riseTo = winning ? 1.42 : 1.08;
+    var fallTo = dying ? 0.45 : killing ? 0.34 : winning ? 1.15 : 0.7;
     var o = AU.ctx.createOscillator();
-    o.type = 'sawtooth';
+    o.type = killing ? 'square' : 'sawtooth';
     o.frequency.setValueAtTime(base * 0.8, t);
-    o.frequency.exponentialRampToValueAtTime(base * 1.08, t + 0.03);
-    o.frequency.setValueAtTime(base * 1.08, t + dur * 0.55);
-    o.frequency.exponentialRampToValueAtTime(base * (dying ? 0.45 : 0.7), t + dur);
+    o.frequency.exponentialRampToValueAtTime(base * riseTo, t + (winning ? dur * 0.6 : 0.03));
+    o.frequency.setValueAtTime(base * riseTo, t + dur * 0.65);
+    o.frequency.exponentialRampToValueAtTime(base * fallTo, t + dur);
     var bp1 = AU.ctx.createBiquadFilter();
     bp1.type = 'bandpass';
-    bp1.frequency.value = 750;
-    bp1.Q.value = 3.5;
+    bp1.frequency.value = killing ? 420 : winning ? 1020 : 750;
+    bp1.Q.value = killing ? 5.5 : 3.5;
     var bp2 = AU.ctx.createBiquadFilter();
     bp2.type = 'bandpass';
-    bp2.frequency.value = 1080;
-    bp2.Q.value = 3.5;
+    bp2.frequency.value = killing ? 610 : winning ? 1620 : 1080;
+    bp2.Q.value = killing ? 5.5 : 3.5;
     var mix = AU.ctx.createGain();
     mix.gain.value = 0.6;
     o.connect(bp1);
@@ -2954,7 +2997,7 @@
     o.connect(bp2);
     bp2.connect(mix);
     var g = AU.ctx.createGain();
-    var lvl = dying ? 0.15 : 0.11;
+    var lvl = dying ? 0.15 : killing ? 0.16 : winning ? 0.14 : 0.11;
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(lvl, t + 0.02);
     g.gain.setValueAtTime(lvl, t + dur * 0.65);
@@ -2965,9 +3008,9 @@
     raspGain.gain.value = 1;
     var rasp = AU.ctx.createOscillator();
     rasp.type = 'sine';
-    rasp.frequency.value = 26 + Math.random() * 14;
+    rasp.frequency.value = (killing ? 15 : 26) + Math.random() * 14;
     var raspDepth = AU.ctx.createGain();
-    raspDepth.gain.value = 0.3;
+    raspDepth.gain.value = killing ? 0.5 : 0.3;
     rasp.connect(raspDepth);
     raspDepth.connect(raspGain.gain);
     rasp.start(t);
@@ -2976,10 +3019,16 @@
     raspGain.connect(AU.master);
     o.start(t);
     o.stop(t + dur + 0.03);
+    if (winning) {
+      /* 尖叫之上叠一段 C-E-G 上行铃音，通关要有"事成了"的落点 */
+      blip('triangle', 523, 523, 0.13, 0.075, 0.10);
+      blip('triangle', 659, 659, 0.13, 0.075, 0.22);
+      blip('triangle', 784, 880, 0.26, 0.09, 0.34);
+    }
   }
 
-  function blip(type, f0, f1, dur, vol) {
-    var t = AU.ctx.currentTime;
+  function blip(type, f0, f1, dur, vol, delay) {
+    var t = AU.ctx.currentTime + (delay || 0);
     var o = AU.ctx.createOscillator();
     o.type = type;
     o.frequency.setValueAtTime(f0, t);
@@ -3291,6 +3340,7 @@
     VER: VER,
     floorAt: floorAt,
     shaftW: shaftW,
+    scream: screamCall,
     pick3: offerPick3
   };
 })();
