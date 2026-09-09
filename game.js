@@ -343,7 +343,7 @@
   }
 
   /* ===================== 状态 ===================== */
-  var VER = 'm50';
+  var VER = 'm51';
   var S = null;
   var P = null;
   var gTier = 3;   // 血量档：1=3血(简单) 2=2血(标准) 3=1血(困难)；本版默认 1 血交付手感
@@ -2379,53 +2379,79 @@
     var x = c.getContext('2d');
     var deepest = S.finalDeepest || P.deepest;
     var tierHp = tierMaxHp();
+    var win = !!S.win;
+    /* 通关＝夜底金墨，殓身＝金底墨字；一张卡只看配色就知道这局的结果 */
+    var BG = win ? '#151b28' : '#e8b23a';
+    var BAND = win ? '#f0c75a' : '#231a05';
+    var INK = win ? '#f0c75a' : '#231a05';
+    var INK2 = win ? '#b8a474' : '#5a4210';
     var i, k;
 
     /* 暖黄主色底 + 顶部深色带；通关加金框 */
-    x.fillStyle = '#e8b23a';
+    x.fillStyle = BG;
     x.fillRect(0, 0, W, H);
-    x.fillStyle = '#231a05';
+    x.fillStyle = BAND;
     x.fillRect(0, 0, W, 160);
-    if (S.win) {
+    if (win) {
       x.strokeStyle = '#f2ead8';
-      x.lineWidth = 10;
+      x.lineWidth = 8;
       x.strokeRect(16, 16, W - 32, H - 32);
+      x.strokeStyle = 'rgba(240,199,90,0.55)';
+      x.lineWidth = 3;
+      x.strokeRect(30, 30, W - 60, H - 60);
     }
     x.textAlign = 'center';
-    x.fillStyle = '#e8b23a';
+    x.fillStyle = win ? '#151b28' : '#e8b23a';
     x.font = '800 60px sans-serif';
     x.fillText('土拨鼠王国史 · 淘井日志', W / 2, 105);
 
     /* 井号 + 殓身层带 */
     x.fillStyle = '#f2ead8';
     x.font = '600 34px sans-serif';
-    x.fillText('今日井 #' + S.seedKey.slice(-4) + ' · ' + bandOf(deepest).name, W / 2, 218);
+    x.fillText('今日井 #' + S.seedKey.slice(-4) + ' · ' + (win ? '井底 · 暗河' : bandOf(deepest).name), W / 2, 218);
 
     /* 超大数字 */
-    x.fillStyle = '#231a05';
+    x.fillStyle = INK;
     x.font = '900 300px sans-serif';
     x.fillText(String(deepest), W / 2 - 80, 590);
     x.font = '800 60px sans-serif';
     x.fillText('层', W / 2 + 235, 590);
 
+    /* 通关印：斜盖在数字右侧，一眼区别于殓身报 */
+    if (win) {
+      x.save();
+      x.translate(918, 452);
+      x.rotate(-0.19);
+      x.fillStyle = 'rgba(180,52,46,0.94)';
+      x.beginPath();
+      x.arc(0, 0, 82, 0, Math.PI * 2);
+      x.fill();
+      x.strokeStyle = '#f0c75a';
+      x.lineWidth = 6;
+      x.stroke();
+      x.lineWidth = 2;
+      x.beginPath();
+      x.arc(0, 0, 68, 0, Math.PI * 2);
+      x.stroke();
+      x.fillStyle = '#f6e3a8';
+      x.font = '900 54px sans-serif';
+      x.fillText('通关', 0, 19);
+      x.restore();
+    }
+
     /* 难度档徽章：心 + 档名（跨档成绩不可比，必须上卡） */
     var hearts = '';
     for (i = 0; i < tierHp; i++) hearts += '\u2665 ';
     x.font = '800 46px sans-serif';
-    x.fillStyle = '#8c1f1c';
+    x.fillStyle = win ? '#f6e3a8' : '#8c1f1c';
     x.fillText(hearts + ' ' + TIER_NAME[gTier - 1] + '档', W / 2, 668);
 
     /* 死因（短版）/ 通关 */
-    x.fillStyle = '#231a05';
+    x.fillStyle = INK;
     x.font = '700 42px sans-serif';
-    x.fillText(S.win ? '你把暗河那条打穿了' : '殓于 ' + (CAUSE_SHORT[S.cause] || '不明'), W / 2, 736);
+    x.fillText(S.win ? '通关 · 你把暗河那条打穿了' : '殓于 ' + (CAUSE_SHORT[S.cause] || '不明'), W / 2, 736);
 
-    /* 构筑图标序列 + 共鸣标签 */
-    var seq = '';
-    for (k = 0; k < S.pickLog.length && k < 14; k++) seq += (ICONS[S.pickLog[k].id] || '') + ' ';
-    x.font = '40px sans-serif';
-    x.fillStyle = '#231a05';
-    x.fillText(seq || '未拾一物', W / 2, 800);
+    /* 共鸣标签（构筑图标改画在左侧轴上，此处不再重复一行） */
     var resTag = '';
     var lines = ['aim', 'volley', 'move', 'econ'];
     for (k = 0; k < lines.length; k++) {
@@ -2433,8 +2459,8 @@
       if (lc2 >= 2) resTag += (resTag ? ' · ' : '') + LINE_NAME[lines[k]] + '\u00D7' + lc2 + (lc2 >= 4 ? ' 大成' : '');
     }
     x.font = '700 32px sans-serif';
-    x.fillStyle = '#5a4210';
-    x.fillText(resTag || '未成流派', W / 2, 850);
+    x.fillStyle = INK2;
+    x.fillText(resTag || '未成流派', W / 2, 800);
 
     /* 叫叫大特写（右下） */
     if (IMG.big) {
@@ -2442,59 +2468,90 @@
       x.drawImage(IMG.big, W - bw - 46, H - 660, bw, bh);
     }
 
-    /* 坠落路线图（左：竖轴 + 构筑节点） */
-    var ax = 120, top = 900, bot = 1250;
-    x.strokeStyle = '#231a05';
+    /* 坠落路线图（左：竖轴，抽到的卡图标直接落在轴上） */
+    var ax = 150, top = 880, bot = 1240;
+    x.strokeStyle = INK;
     x.lineWidth = 6;
     x.beginPath();
     x.moveTo(ax, top);
     x.lineTo(ax, bot);
     x.stroke();
-    var mk = Math.round(bot - (deepest / CFG.TOTAL_FLOORS) * (bot - top));
-    x.fillStyle = '#d9534f';
-    x.beginPath();
-    x.arc(ax, mk, 16, 0, Math.PI * 2);
-    x.fill();
-    x.font = '700 30px sans-serif';
-    x.fillStyle = '#231a05';
-    x.textAlign = 'left';
-    x.fillText('第 ' + deepest + ' 层', ax + 32, mk + 10);
+    x.font = '600 22px sans-serif';
+    x.fillStyle = INK2;
+    x.textAlign = 'center';
+    x.fillText('井口', ax, top - 18);
+    x.fillText('井底', ax, bot + 30);
+    var laneY = [-9999, -9999], numY = [-9999, -9999];
     for (i = 0; i < S.pickLog.length; i++) {
       var pl = S.pickLog[i];
       var py = Math.round(top + ((pl.floor - 1) / (CFG.TOTAL_FLOORS - 1)) * (bot - top));
-      x.fillStyle = '#231a05';
+      var lane = (py - laneY[0] >= py - laneY[1] ? 0 : 1);
+      var off = lane * 52;
+      laneY[lane] = py;
+      if (lane) {
+        x.strokeStyle = INK2;
+        x.lineWidth = 3;
+        x.beginPath();
+        x.moveTo(ax, py);
+        x.lineTo(ax + off, py);
+        x.stroke();
+      }
+      x.fillStyle = win ? 'rgba(240,199,90,0.14)' : 'rgba(35,26,5,0.07)';
       x.beginPath();
-      x.arc(ax, py, 9, 0, Math.PI * 2);
+      x.arc(ax + off, py, 22, 0, Math.PI * 2);
       x.fill();
-      x.font = '600 26px sans-serif';
-      x.fillText('B' + pl.floor + ' ' + (MOD_SHORT[pl.id] || pl.id), ax + 28, py + 9);
+      x.strokeStyle = INK;
+      x.lineWidth = 3;
+      x.stroke();
+      x.textAlign = 'center';
+      x.font = '30px sans-serif';
+      x.fillStyle = INK;
+      x.fillText(ICONS[pl.id] || (MOD_SHORT[pl.id] || '?'), ax + off, py + 11);
+      if (py - numY[lane] >= 30) {
+        numY[lane] = py;
+        x.font = '700 24px sans-serif';
+        x.fillStyle = INK2;
+        if (lane) {
+          x.textAlign = 'left';
+          x.fillText('B' + pl.floor, ax + off + 28, py + 9);
+        } else {
+          x.textAlign = 'right';
+          x.fillText('B' + pl.floor, ax - 28, py + 9);
+        }
+      }
     }
+    if (!S.pickLog.length) {
+      x.textAlign = 'left';
+      x.font = '600 28px sans-serif';
+      x.fillStyle = INK2;
+      x.fillText('未拾一物', ax + 26, (top + bot) / 2);
+    }
+    x.textAlign = 'center';
 
     /* 战绩两行 */
-    x.textAlign = 'center';
     x.font = '600 32px sans-serif';
-    x.fillStyle = '#231a05';
+    x.fillStyle = INK;
     var mm = Math.floor(S.runT / 60), ss2 = Math.floor(S.runT % 60);
     x.fillText('用时 ' + mm + ':' + (ss2 < 10 ? '0' : '') + ss2 + ' · 破坝 ' + S.brokeBlocks + ' · 通蛙 ' + (S.frogKills || 0) + ' · 出籽 ' + S.shots, W / 2, 1310);
     var yd = gSave.yesterdayFloor > 0 ? ' · 比昨天深 ' + Math.max(0, deepest - gSave.yesterdayFloor) + ' 层' : '';
     x.font = '600 28px sans-serif';
-    x.fillStyle = '#5a4210';
+    x.fillStyle = INK2;
     x.fillText('今日第 ' + gSave.todayTries + ' 次 · 累计 ' + gSave.totalRuns + ' 局 · 纪录 ' + gSave.deepest + ' 层' + yd, W / 2, 1352);
 
-    /* 底部 CTA 深色条 */
-    x.fillStyle = '#231a05';
+    /* 底部 CTA 条 */
+    x.fillStyle = BAND;
     x.fillRect(0, 1386, W, 54);
     x.textAlign = 'center';
     x.font = '700 30px sans-serif';
-    x.fillStyle = '#e8b23a';
-    x.fillText('同一天，同一口井 —— 你也来试试', W / 2, 1422);
+    x.fillStyle = BG;
+    x.fillText(win ? '井底那条已经通了 —— 你也来试试' : '同一天，同一口井 —— 你也来试试', W / 2, 1422);
     x.textAlign = 'right';
     x.font = '600 24px sans-serif';
-    x.fillStyle = '#8a7440';
+    x.fillStyle = win ? 'rgba(21,27,40,0.66)' : '#8a7440';
     x.fillText('王国史第二章', W - 30, 1422);
 
     /* 噪点 + 暗角 */
-    x.fillStyle = 'rgba(35,26,5,0.06)';
+    x.fillStyle = win ? 'rgba(240,199,90,0.07)' : 'rgba(35,26,5,0.06)';
     for (var n2 = 0; n2 < 500; n2++) {
       x.fillRect(Math.random() * W, Math.random() * H, 3, 3);
     }
