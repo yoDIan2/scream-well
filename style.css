@@ -47,6 +47,10 @@ html, body {
   font-weight: 700;
 }
 
+/* 收起态：整条只留版本号 + 那颗切换钮，不占住画面上沿 */
+#proto-bar.min button { display: none; }
+#proto-bar.min #btn-bar-min { display: inline-block; }
+
 #proto-tag {
   display: inline-block;
   margin-right: 5px;

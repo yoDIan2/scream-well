@@ -343,7 +343,7 @@
   }
 
   /* ===================== 状态 ===================== */
-  var VER = 'm4v';
+  var VER = 'm4w';
   var S = null;
   var P = null;
   var gTier = 3;   // 血量档：1=3血(简单) 2=2血(标准) 3=1血(困难)；本版默认 1 血交付手感
@@ -2133,34 +2133,47 @@
     ctx.globalAlpha = 1;
   }
 
+  /* 心形：贝塞尔曲线（原来的两圆+三角形太粗糙）。循环内零分配，只用纯色填充 */
+  function heartPath(cx, cy, s) {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy + s * 0.82);
+    ctx.bezierCurveTo(cx - s * 1.2, cy - s * 0.06, cx - s * 0.62, cy - s * 1.02, cx, cy - s * 0.34);
+    ctx.bezierCurveTo(cx + s * 0.62, cy - s * 1.02, cx + s * 1.2, cy - s * 0.06, cx, cy + s * 0.82);
+    ctx.closePath();
+  }
+
   function drawHud() {
     /* 心 */
     for (var i = 0; i < tierMaxHp(); i++) {
-      ctx.fillStyle = i < P.hp ? '#d9534f' : 'rgba(255,255,255,0.16)';
-      var hx = 18 + i * 30, hy = 22;
-      ctx.beginPath();
-      ctx.arc(hx, hy, 10, 0, Math.PI * 2);
-      ctx.arc(hx + 12, hy, 10, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(hx - 10, hy + 4); ctx.lineTo(hx + 22, hy + 4); ctx.lineTo(hx + 6, hy + 24);
-      ctx.closePath(); ctx.fill();
+      var hx = 24 + i * 32, hy = 34, aliveHeart = i < P.hp;
+      ctx.lineWidth = 2;
+      if (aliveHeart) {
+        ctx.fillStyle = '#e0554f';
+        heartPath(hx, hy, 11); ctx.fill();
+        ctx.strokeStyle = 'rgba(90,20,18,0.75)';
+        heartPath(hx, hy, 11); ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        ctx.beginPath(); ctx.arc(hx - 4.2, hy - 3.4, 2.4, 0, Math.PI * 2); ctx.fill();
+      } else {
+        ctx.strokeStyle = 'rgba(242,234,216,0.3)';
+        heartPath(hx, hy, 11); ctx.stroke();
+      }
     }
     /* 凝视窗口读数：让光环有名字 */
     if (P.mods.gaze && P.gazeT > 0) {
       ctx.fillStyle = '#e8b23a';
       ctx.font = '800 14px sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText('凝视 ' + ((P.gazeT * 10 | 0) / 10) + 's', 18, 72);
+      ctx.fillText('凝视 ' + ((P.gazeT * 10 | 0) / 10) + 's', 20, 86);
     }
-    /* 层数 */
+    /* 层数：字号加大、离顶部留距离 */
     ctx.fillStyle = '#f2ead8';
-    ctx.font = '800 26px sans-serif';
+    ctx.font = '800 34px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('第 ' + P.floor + ' / ' + CFG.TOTAL_FLOORS + ' 层', CFG.LOGICAL_W * 0.5, 42);
+    ctx.fillText('第 ' + P.floor + ' / ' + CFG.TOTAL_FLOORS + ' 层', CFG.LOGICAL_W * 0.5, 62);
     ctx.font = '600 14px sans-serif';
     ctx.fillStyle = 'rgba(242,234,216,0.55)';
-    ctx.fillText(bandOf(P.floor).name + ' · 井宽 ' + Math.round(shaftW(P.y)) + 'px', CFG.LOGICAL_W * 0.5, 64);
+    ctx.fillText(bandOf(P.floor).name + ' · 井宽 ' + Math.round(shaftW(P.y)) + 'px', CFG.LOGICAL_W * 0.5, 84);
     ctx.textAlign = 'left';
 
     /* 弹药：瓜子图标排一行，超过 20 颗降级为"图标 + 数字"（审阅漏洞 #9） */
@@ -2184,6 +2197,23 @@
       ctx.font = '800 22px sans-serif';
       ctx.fillText('颊囊空了！', CFG.LOGICAL_W - 150, ay + 4);
     }
+    /* 下落速度表：硬着陆是"看不见的红线"，先把速度本身给出来（阈值怎么算等 D4 定） */
+    var ggW = 122, ggH = 9, ggX = CFG.LOGICAL_W - 20 - ggW, ggY = VIEW.h - 44;
+    var ggDanger = CFG.T_HARDLAND ? CFG.HARD_LAND_SPEED : 1e9;
+    var ggV = P.vy > 0 ? P.vy : 0;
+    ctx.fillStyle = 'rgba(255,255,255,0.14)';
+    ctx.fillRect(ggX, ggY, ggW, ggH);
+    ctx.fillStyle = P.vy >= ggDanger ? '#ff5b52' : (P.vy > ggDanger * 0.72 ? '#e8b23a' : '#8fb6c9');
+    ctx.fillRect(ggX, ggY, ggW * Math.min(1, ggV / ggDanger), ggH);
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(ggX + 0.5, ggY + 0.5, ggW - 1, ggH - 1);
+    ctx.font = '700 12px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillStyle = P.vy >= ggDanger ? '#ff5b52' : 'rgba(242,234,216,0.72)';
+    ctx.fillText(P.vy > 0 ? ('下落 ' + Math.round(P.vy) + (P.vy >= ggDanger ? ' 会摔伤' : '')) : '上升',
+      CFG.LOGICAL_W - 20, ggY - 7);
+    ctx.textAlign = 'left';
     /* Boss 血条：从它上面一层就开始显示，否则玩家看不见这条血存在＝打不掉血的错觉 */
     var hudBoss = floorAt(CFG.TOTAL_FLOORS).boss;
     if (hudBoss.alive && P.floor >= CFG.TOTAL_FLOORS - 1) drawBossBar(hudBoss);
@@ -2592,6 +2622,14 @@
   togBtns[2].addEventListener('click', function () { CFG.T_BIGFISH = !CFG.T_BIGFISH; syncToggleBtns(); });
   var elAmmoBtn = document.getElementById('btn-t-ammo');
   if (elAmmoBtn) elAmmoBtn.addEventListener('click', function () { CFG.T_INFAMMO = !CFG.T_INFAMMO; syncToggleBtns(); });
+  /* 调试条收起/展开：一整排按钮会挡住画面上沿，收起来只剩版本号 + 这颗钮 */
+  var elBarMin = document.getElementById('btn-bar-min');
+  if (elBarMin) elBarMin.addEventListener('click', function () {
+    var bar = document.getElementById('proto-bar');
+    var mins = bar.className.indexOf('min') >= 0;
+    bar.className = mins ? '' : 'min';
+    elBarMin.textContent = mins ? '收起' : '展开';
+  });
   p3Btns[0].addEventListener('click', function () { if (S.pick3) applyPick(S.pick3.offers[0].id); });
   p3Btns[1].addEventListener('click', function () { if (S.pick3) applyPick(S.pick3.offers[1].id); });
   p3Btns[2].addEventListener('click', function () { if (S.pick3) applyPick(S.pick3.offers[2].id); });
@@ -3125,7 +3163,12 @@
   document.getElementById('proto-tag').textContent = VER;
   /* 顶部原型条只在 ?debug=1 时出现（重开/下跳/山洪/三原型开关都是开发工具） */
   if (!gDebug) document.getElementById('proto-bar').className = 'hidden';
-  else { gAttract = false; elHome.className = 'hidden'; }   // 调试档：刷新即下井，不停首页
+  else {
+    document.getElementById('proto-bar').className = 'min';   // 默认收起，只露版本号 + 那颗钮
+    var elBM = document.getElementById('btn-bar-min');
+    if (elBM) elBM.textContent = '展开';                      // 收起态下钮文案必须是"展开"
+    gAttract = false; elHome.className = 'hidden';            // 调试档：刷新即下井，不停首页
+  }
   if (gBossJump) { gAttract = false; elHome.className = 'hidden'; dropToBoss(); }   // ?boss=1：不依赖调试条直达井底
   syncToggleBtns();
   requestAnimationFrame(frame);
