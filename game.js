@@ -343,7 +343,7 @@
   }
 
   /* ===================== 状态 ===================== */
-  var VER = 'm4y';
+  var VER = 'm4z';
   var S = null;
   var P = null;
   var gTier = 3;   // 血量档：1=3血(简单) 2=2血(标准) 3=1血(困难)；本版默认 1 血交付手感
@@ -1949,7 +1949,26 @@
     drawFrogFx(fg, cx);
   }
 
+  /* 井道裁剪带：井身是随 y 缓移的曲线，按 y0..y1 采样若干点构造多边形，
+     用来把比井还宽的东西（Boss 的鱼头鱼尾）藏进井壁后面 */
+  function clipShaft(y0, y1) {
+    var n = 6, i, y;
+    ctx.beginPath();
+    ctx.moveTo(shaftL(y0), y0);
+    for (i = 1; i <= n; i++) { y = y0 + (y1 - y0) * i / n; ctx.lineTo(shaftR(y), y); }
+    for (i = n; i >= 0; i--) { y = y0 + (y1 - y0) * i / n; ctx.lineTo(shaftL(y), y); }
+    ctx.closePath();
+    ctx.clip();
+  }
+
   /* ===================== m4o 井底 Boss 绘制 ===================== */
+  /* 漫堤鱼贴图嘴心在成品图内的归一化坐标（704x450 / 694x704 两张各自量出来的），
+     用它把图上的洞锚到命中通道中心，玩家看到的嘴就是判定生效的嘴 */
+  var BOSS_SPR = {
+    main: { nx: 0.355, ny: 0.344, w: 1.45 },
+    gorged: { nx: 0.432, ny: 0.412, w: 1.55 }
+  };
+
   function drawBoss(bs) {
     var l = shaftL(bs.y), r = shaftR(bs.y);
     var bodyH = 92, alive = bs.alive;
@@ -1960,35 +1979,72 @@
       sink = age0 * age0 * 620;
       alpha = Math.max(0, 1 - age0 / 1.3);
     }
+    var ageb = S.animT - (bs.hitT === undefined ? -9 : bs.hitT);
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.translate(0, sink);
-    ctx.fillStyle = '#2f4a5c';
-    ctx.fillRect(l, bs.y - 10, r - l, bodyH);
-    ctx.fillStyle = 'rgba(0,0,0,0.22)';
-    ctx.fillRect(l, bs.y + bodyH - 34, r - l, 22);
-    ctx.fillStyle = '#3c5f74';
-    for (var tf = 0; tf < 3; tf++) ctx.fillRect(l + 6, bs.y + 4 + tf * 22, 26, 12);
-    /* 眼睛与嘴一起随 mouthCx 游：让玩家看见"对准线在走" */
-    ctx.fillStyle = '#e8d9a8';
-    ctx.beginPath(); ctx.arc(bs.mouthCx - 48, bs.y - 16, 9, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(bs.mouthCx + 48, bs.y - 16, 9, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#16242c';
-    ctx.beginPath(); ctx.arc(bs.mouthCx - 48, bs.y - 16, 4, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(bs.mouthCx + 48, bs.y - 16, 4, 0, Math.PI * 2); ctx.fill();
+    var gorged = bs.phase === 2 && bs.wstate !== 'idle';
+    var im = gorged ? IMG.bossGorged : IMG.boss;
     var mw = CFG.BOSS_MOUTH_W * 0.5;
     var mh = 6 + bs.openness * 34;
-    ctx.fillStyle = '#16242c';
-    ctx.fillRect(bs.mouthCx - mw, bs.y - 12 - mh * 0.5, mw * 2, mh + 10);
-    ctx.fillStyle = bs.open ? '#d9534f' : '#4a6472';
-    ctx.fillRect(bs.mouthCx - mw + 5, bs.y - 10 - mh * 0.5, mw * 2 - 10, Math.max(2, mh - 6));
-    var ageb = S.animT - (bs.hitT === undefined ? -9 : bs.hitT);
-    if (ageb < 0.1) {
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = alpha * (0.1 - ageb) * 3;
-      ctx.fillStyle = '#9fd8ef';
+
+    if (im) {
+      var sp = gorged ? BOSS_SPR.gorged : BOSS_SPR.main;
+      var dw = (r - l) * sp.w;
+      var dh = dw * (im.naturalHeight / im.naturalWidth);
+      var dx = bs.mouthCx - dw * sp.nx;
+      var dy = bs.y - 40 - dh * sp.ny;
+      ctx.save();
+      clipShaft(dy, dy + dh);
+      ctx.drawImage(im, dx, dy, dw, dh);
+      /* 闭嘴＝拿一块和背同色的盖子糊住洞：不换帧也能读出"这一下打不着" */
+      var shut = 1 - bs.openness;
+      if (shut > 0.06) {
+        ctx.fillStyle = gorged ? '#5d7683' : '#3c5f74';
+        ctx.beginPath();
+        ctx.ellipse(bs.mouthCx, bs.y - 40, dw * 0.105, dh * 0.11 * shut + 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      if (bs.open) {
+        ctx.strokeStyle = 'rgba(217,83,79,' + (0.42 + 0.4 * bs.openness).toFixed(3) + ')';
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.ellipse(bs.mouthCx, bs.y - 40, dw * 0.1, dh * 0.095, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      if (ageb < 0.1) {
+        /* 同一张图 lighter 叠自身：透明像素加不出东西，等于只把鱼身提亮 */
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = alpha * (0.1 - ageb) * 2.4;
+        ctx.drawImage(im, dx, dy, dw, dh);
+        ctx.globalCompositeOperation = 'source-over';
+      }
+      ctx.restore();
+    } else {
+      ctx.fillStyle = '#2f4a5c';
       ctx.fillRect(l, bs.y - 10, r - l, bodyH);
-      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = 'rgba(0,0,0,0.22)';
+      ctx.fillRect(l, bs.y + bodyH - 34, r - l, 22);
+      ctx.fillStyle = '#3c5f74';
+      for (var tf = 0; tf < 3; tf++) ctx.fillRect(l + 6, bs.y + 4 + tf * 22, 26, 12);
+      /* 眼睛与嘴一起随 mouthCx 游：让玩家看见"对准线在走" */
+      ctx.fillStyle = '#e8d9a8';
+      ctx.beginPath(); ctx.arc(bs.mouthCx - 48, bs.y - 16, 9, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(bs.mouthCx + 48, bs.y - 16, 9, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#16242c';
+      ctx.beginPath(); ctx.arc(bs.mouthCx - 48, bs.y - 16, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(bs.mouthCx + 48, bs.y - 16, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#16242c';
+      ctx.fillRect(bs.mouthCx - mw, bs.y - 12 - mh * 0.5, mw * 2, mh + 10);
+      ctx.fillStyle = bs.open ? '#d9534f' : '#4a6472';
+      ctx.fillRect(bs.mouthCx - mw + 5, bs.y - 10 - mh * 0.5, mw * 2 - 10, Math.max(2, mh - 6));
+      if (ageb < 0.1) {
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = alpha * (0.1 - ageb) * 3;
+        ctx.fillStyle = '#9fd8ef';
+        ctx.fillRect(l, bs.y - 10, r - l, bodyH);
+        ctx.globalCompositeOperation = 'source-over';
+      }
     }
     ctx.restore();
   }
@@ -2032,7 +2088,7 @@
   }
 
   /* ===================== 素材 ===================== */
-  var IMG = { jiao: null, big: null, spider: null, bug: null, frog: null, spike: null, block: null, wall: [null, null, null, null] };
+  var IMG = { jiao: null, big: null, spider: null, bug: null, frog: null, boss: null, bossGorged: null, spike: null, block: null, wall: [null, null, null, null] };
 
   function loadImages() {
     var a = new Image();
@@ -2050,6 +2106,12 @@
     var e = new Image();
     e.onload = function () { IMG.frog = e; };
     e.src = './assets/tenant-frog.png';
+    var bf = new Image();
+    bf.onload = function () { IMG.boss = bf; };
+    bf.src = './assets/boss-fish.png';
+    var bg2 = new Image();
+    bg2.onload = function () { IMG.bossGorged = bg2; };
+    bg2.src = './assets/boss-fish-gorged.png';
     var f = new Image();
     f.onload = function () { IMG.spike = f; };
     f.src = './assets/spike.png';
