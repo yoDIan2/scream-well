@@ -340,7 +340,7 @@
   }
 
   /* ===================== 状态 ===================== */
-  var VER = 'm4q';
+  var VER = 'm4r';
   var S = null;
   var P = null;
   var gTier = 3;   // 血量档：1=3血(简单) 2=2血(标准) 3=1血(困难)；本版默认 1 血交付手感
@@ -2558,6 +2558,22 @@
     newRun();
   });
   elMute.addEventListener('click', toggleAudio);
+
+  /* 三击版本号＝开调试条：手机上改 URL 麻烦，而调试条是 m4i 自己藏起来的（只在 ?debug=1 显示）
+     计时用 Date.now()——首页期间物理不推进，S.animT 是冻住的 */
+  var dbgTaps = 0, dbgTapAt = 0;
+  document.getElementById('home-ver').addEventListener('click', function () {
+    var now = Date.now();
+    if (now - dbgTapAt > 1500) dbgTaps = 0;
+    dbgTapAt = now;
+    if (++dbgTaps < 3) return;
+    dbgTaps = 0;
+    gDebug = true;
+    document.getElementById('proto-bar').className = '';
+    this.textContent = 'v-' + VER + ' · 调试已开';
+    gAttract = false;
+    elHome.className = 'hidden';
+  });
 
   window.addEventListener('resize', resize);
 
