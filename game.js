@@ -340,11 +340,12 @@
   }
 
   /* ===================== 状态 ===================== */
-  var VER = 'm4p';
+  var VER = 'm4q';
   var S = null;
   var P = null;
-  var gTier = 3;   // 血量档：1=3血(新手) 2=2血(标准) 3=1血(进阶)；本版默认 1 血交付手感
+  var gTier = 3;   // 血量档：1=3血(简单) 2=2血(标准) 3=1血(困难)；本版默认 1 血交付手感
   var gDebug = false;
+  var gBossJump = false;   // ?boss=1：开局直接落到井底 Boss 面前，省掉手动跳 99 层
   var gAttract = true;   // 首页期间：井画着但物理不推进（潭水钟也不走）
   var fps = 60, fpsAcc = 0, fpsN = 0;
 
@@ -357,6 +358,7 @@
   function parseUrlOpts() {
     var params = (window.location.search || '');
     if (params.indexOf('debug=1') >= 0) gDebug = true;
+    if (params.indexOf('boss=1') >= 0) gBossJump = true;
     var mx = params.indexOf('x=');
     if (mx >= 0) {
       var v = parseInt(params.charAt(mx + 2), 10);
@@ -2486,6 +2488,19 @@
     P.dwell = 0;
   }
 
+  /* 调试直达井底 Boss：落在它上方 300px（籽的射程只有约 400px，再远第一发要 1.2 秒才打到，
+     会被误判成"打不到"）；不能落在它背以下——那会直接触发通关判定，什么也测不到 */
+  function dropToBoss() {
+    if (S.over) return;
+    var bsn = floorAt(CFG.TOTAL_FLOORS).boss;
+    P.y = bsn.y - 300;
+    P.vy = 0;
+    P.floor = floorOf(P.y);   // 不同步的话 HUD 会先亮"第 1 层"再跳到 99 层
+    P.ammo = ammoCap();
+    P.dwell = 0;
+    S.camY = P.y - VIEW.h * CFG.CAM_ANCHOR;
+  }
+
   barBtns[0].addEventListener('click', function () { setTier(1); });
   barBtns[1].addEventListener('click', function () { setTier(2); });
   barBtns[2].addEventListener('click', function () { setTier(3); });
@@ -2495,17 +2510,8 @@
   document.getElementById('btn-restart').addEventListener('click', function () { newRun(); });
   document.getElementById('btn-again').addEventListener('click', function () { newRun(); });
   document.getElementById('btn-jump').addEventListener('click', function () { jumpFloors(10); });
-  /* 调试直达：落在 Boss 上方 300px。籽的射程只有约 400px，420 会压在边缘（实测第一发要 1.2 秒才打到，
-     会让人误判成"打不到"）；落点也不能低于它的背——那会直接触发通关判定，什么也测不到 */
-  document.getElementById('btn-boss').addEventListener('click', function () {
-    if (S.over) return;
-    var bsn = floorAt(CFG.TOTAL_FLOORS).boss;
-    P.y = bsn.y - 300;
-    P.vy = 0;
-    P.ammo = ammoCap();
-    P.dwell = 0;
-    S.camY = P.y - VIEW.h * CFG.CAM_ANCHOR;
-  });
+  var elBossBtn = document.getElementById('btn-boss');
+  if (elBossBtn) elBossBtn.addEventListener('click', dropToBoss);   // 旧 HTML 缓存里没这个按钮：绝不能因此中断启动
   document.getElementById('btn-flood').addEventListener('click', function () {
     if (S.waterOn || floorAt(CFG.TOTAL_FLOORS).boss.alive) return;   // Boss 层的水位归它自己的状态机管
     triggerFlood();
@@ -3046,6 +3052,7 @@
   /* 顶部原型条只在 ?debug=1 时出现（重开/下跳/山洪/三原型开关都是开发工具） */
   if (!gDebug) document.getElementById('proto-bar').className = 'hidden';
   else { gAttract = false; elHome.className = 'hidden'; }   // 调试档：刷新即下井，不停首页
+  if (gBossJump) { gAttract = false; elHome.className = 'hidden'; dropToBoss(); }   // ?boss=1：不依赖调试条直达井底
   syncToggleBtns();
   requestAnimationFrame(frame);
 
