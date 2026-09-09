@@ -104,6 +104,7 @@
     T_MAGNET: true,
     T_HARDLAND: true,
     T_BIGFISH: true,
+    T_INFAMMO: false,        // 调试：不扣弹药，用来量"打完一整场到底要多少发"
 
     /* ==== m4o 井底 Boss「漫堤鱼」：暗河的鱼，比看天蛙强一档（强在机制维度，不在血量） ==== */
     BOSS_HP: 30,             // = 最强那只蛙(75关满构筑)同级；弹药算术的上限就在这
@@ -340,7 +341,7 @@
   }
 
   /* ===================== 状态 ===================== */
-  var VER = 'm4s';
+  var VER = 'm4t';
   var S = null;
   var P = null;
   var gTier = 3;   // 血量档：1=3血(简单) 2=2血(标准) 3=1血(困难)；本版默认 1 血交付手感
@@ -359,6 +360,7 @@
     var params = (window.location.search || '');
     if (params.indexOf('debug=1') >= 0) gDebug = true;
     if (params.indexOf('boss=1') >= 0) gBossJump = true;
+    if (params.indexOf('ammo=1') >= 0) CFG.T_INFAMMO = true;
     var mx = params.indexOf('x=');
     if (mx >= 0) {
       var v = parseInt(params.charAt(mx + 2), 10);
@@ -400,7 +402,7 @@
       frogCorpse: null,
       frogText: null,
       floatTexts: [],
-      lastShotT: -1, chargeNext: false, burned: {}, shellT: 0, pickRound: 0, frogKills: 0, bossKilled: false,
+      lastShotT: -1, chargeNext: false, burned: {}, shellT: 0, pickRound: 0, frogKills: 0, bossKilled: false, bossShots: 0,
       flashT: 0,
       animT: 0
     };
@@ -733,9 +735,10 @@
     var prevShotT = S.lastShotT;
     S.lastShotT = S.runT;
     S.chargeNext = !!(P.mods.hold && prevShotT >= 0 && S.runT - prevShotT > 0.3);
-    P.ammo--;
+    if (!CFG.T_INFAMMO) P.ammo--;
     P.fireCd = CFG.FIRE_CD / (1 + 0.3 * lvl('rate') + (linePerk('volley') ? 0.2 : 0));
     S.shots++;
+    if (P.floor >= CFG.TOTAL_FLOORS - 1) S.bossShots++;   // 井底这一战的真实消耗，给用户自己量够不够
     if (P.ammo === 0 && S.ammoOutT < 0) S.ammoOutT = S.runT;
     var sp = lvl('split');
     if (linePerk('volley') && sp < 2) sp = 2;   // 弹幕大成：分裂视为满级
@@ -1977,6 +1980,10 @@
     ctx.textAlign = 'center';
     ctx.fillText(bs.phase === 2 ? '漫堤鱼 · 它在吸水' : (bs.phase >= 3 ? '漫堤鱼 · 它没力气了' : '漫堤鱼 · 暗河'),
       CFG.LOGICAL_W * 0.5, byy - 8);
+    ctx.font = '700 12px sans-serif';
+    ctx.fillStyle = CFG.T_INFAMMO ? '#e8b23a' : '#8e97a8';
+    ctx.fillText('本战已射 ' + S.bossShots + ' 发 · 剩 ' + P.ammo + (CFG.T_INFAMMO ? ' · 无限弹' : ''),
+      CFG.LOGICAL_W * 0.5, byy + 31);
     ctx.textAlign = 'left';
   }
 
@@ -2402,7 +2409,7 @@
     elResDepth.textContent = S.win ? '通到井底' : ('第 ' + P.deepest + ' 层');
     var bEnd = floorAt(CFG.TOTAL_FLOORS).boss;
     var bLine = (bEnd && bEnd.hp < bEnd.maxHp)
-      ? '\n漫堤鱼 ' + bEnd.hp + '/' + bEnd.maxHp + ' · 第 ' + bEnd.phase + ' 阶段' + (bEnd.alive ? '' : ' · 已打穿')
+      ? '\n漫堤鱼 ' + bEnd.hp + '/' + bEnd.maxHp + ' · 第 ' + bEnd.phase + ' 阶段 · 本战射 ' + S.bossShots + ' 发' + (bEnd.alive ? '' : ' · 已打穿')
       : '';
     var meta = '用时 ' + mm + ':' + (ss < 10 ? '0' : '') + ss +
       ' · 射出 ' + S.shots + ' 颗籽' +
@@ -2437,6 +2444,8 @@
     togBtns[0].className = CFG.T_MAGNET ? 'on' : '';
     togBtns[1].className = CFG.T_HARDLAND ? 'on' : '';
     togBtns[2].className = CFG.T_BIGFISH ? 'on' : '';
+    var elA = document.getElementById('btn-t-ammo');
+    if (elA) elA.className = CFG.T_INFAMMO ? 'on' : '';
   }
 
   function setTier(m) {
@@ -2553,6 +2562,8 @@
   togBtns[0].addEventListener('click', function () { CFG.T_MAGNET = !CFG.T_MAGNET; syncToggleBtns(); });
   togBtns[1].addEventListener('click', function () { CFG.T_HARDLAND = !CFG.T_HARDLAND; syncToggleBtns(); });
   togBtns[2].addEventListener('click', function () { CFG.T_BIGFISH = !CFG.T_BIGFISH; syncToggleBtns(); });
+  var elAmmoBtn = document.getElementById('btn-t-ammo');
+  if (elAmmoBtn) elAmmoBtn.addEventListener('click', function () { CFG.T_INFAMMO = !CFG.T_INFAMMO; syncToggleBtns(); });
   p3Btns[0].addEventListener('click', function () { if (S.pick3) applyPick(S.pick3.offers[0].id); });
   p3Btns[1].addEventListener('click', function () { if (S.pick3) applyPick(S.pick3.offers[1].id); });
   p3Btns[2].addEventListener('click', function () { if (S.pick3) applyPick(S.pick3.offers[2].id); });
