@@ -219,6 +219,25 @@
   };
 
   function lvl(id) { return (P && P.mods && P.mods[id]) || 0; }
+  /* ==== m52 D4 硬着陆：能掉多快、多快会摔伤、从第几层开始会，全部只在这里算一次 ==== */
+  /* 基础上限：正常情况下能掉到的末速。不含泄洪的临时 ×1.4 ⇒ 破坝那一瞬间不再解锁新死法 */
+  function fallCapBase() {
+    var fl = (P && P.floor) || 0;
+    var c = (CFG.FALL_CAP_BASE + CFG.FALL_CAP_PER_FLOOR * fl) * (1 + 0.08 * lvl('fin'));
+    if (lvl('feather') > 0) c *= 0.88;
+    return c;
+  }
+  /* 判死线：泄洪期间随上限同比例抬高，所以它是一根会动的线，不是钉死的常量 */
+  function hardLandLine() {
+    if (!CFG.T_HARDLAND) return 1e9;
+    return CFG.HARD_LAND_SPEED * (S && S.flushing ? CFG.FLUSH_BOOST_MULT : 1);
+  }
+  /* 从这一层起，光是自由落体的末速就足够把自己砸死 */
+  function firstLethalFloor() {
+    var mult = (1 + 0.08 * lvl('fin')) * (lvl('feather') > 0 ? 0.88 : 1);
+    var n = Math.floor((CFG.HARD_LAND_SPEED / mult - CFG.FALL_CAP_BASE) / CFG.FALL_CAP_PER_FLOOR) + 1;
+    return n < 1 ? 1 : n;
+  }
   function tierMaxHp() { return CFG.TIER_HP[gTier - 1] || 3; }
   var TIER_NAMES = ['简单', '标准', '困难'];
   function tierName(t) { return TIER_NAMES[t - 1] || '标准'; }
@@ -343,7 +362,7 @@
   }
 
   /* ===================== 状态 ===================== */
-  var VER = 'm51';
+  var VER = 'm52';
   var S = null;
   var P = null;
   var gTier = 3;   // 血量档：1=3血(简单) 2=2血(标准) 3=1血(困难)；本版默认 1 血交付手感
@@ -394,6 +413,7 @@
       waterDmg: 0,
       lastFloor: 1,
       flushT: 0,
+      flushing: false,
       pick3: null,
       lastPick3Floor: 0,
       pickLog: [],
@@ -914,9 +934,9 @@
 
     /* --- 玩家垂直 --- */
     P.vy += CFG.GRAVITY * dt;
-    var cap = (CFG.FALL_CAP_BASE + CFG.FALL_CAP_PER_FLOOR * P.floor) * (1 + 0.08 * lvl('fin'));
-    if (S.flushT > 0) { cap *= CFG.FLUSH_BOOST_MULT; S.flushT -= dt; }
-    if (lvl('feather') > 0) cap *= 0.88;
+    var cap = fallCapBase();
+    S.flushing = S.flushT > 0;
+    if (S.flushing) { cap *= CFG.FLUSH_BOOST_MULT; S.flushT -= dt; }
     if (P.mods.ball && P.vy > 0) {
       /* 漏气的皮球：贴壁缓降 */
       if (P.x - shaftL(P.y) < 40 || shaftR(P.y) - P.x < 40) P.vy = Math.min(P.vy, cap * 0.55);
@@ -947,8 +967,9 @@
           if (P.vy >= 0 && prevBottom <= f.block.y + 2 && P.y + P.r >= f.block.y) {
             P.y = f.block.y - P.r;
             var impact = P.vy;
-            if (CFG.T_HARDLAND && impact > CFG.HARD_LAND_SPEED) {
+            if (CFG.T_HARDLAND && impact > hardLandLine()) {
               hurt('硬着陆', false);
+              floatText(P.x, P.y - P.r - 26, '摔伤 · 落速 ' + Math.round(impact), '#ff8f86');
               P.vy = -impact * 0.22;
             } else if (impact > CFG.SOFT_LAND_SPEED) {
               P.vy = -impact * 0.45;
@@ -1244,7 +1265,9 @@
             var fw3 = shaftW(bf.frog.y) * 1.04;
             var fh3 = fw3 * 0.416 * 0.62;
             S.frogCorpse = { x: mcx, y: bf.frog.y, t: 0, w: fw3, h: fh3 };
-            S.frogText = { x: mcx, y: bf.frog.y - 60, t: 0 };
+            S.frogText = { x: mcx, y: bf.frog.y - 60, t: 0, warn: bf.n >= firstLethalFloor()
+              ? '从现在起，砸在坝上会摔伤'
+              : '再往下 ' + (firstLethalFloor() - bf.n) + ' 层，砸在坝上会摔伤' };
             burst(mcx, bf.frog.y, 18, '#8fbf6a', 300);
             if (P.mods.map && !S.pick3) offerPick3(bn);
           }
@@ -1443,7 +1466,7 @@
     if (S.flashT > 0) S.flashT -= dtReal;
     if (S.slowmo > 0) S.slowmo -= dtReal;
     if (S.frogCorpse) { S.frogCorpse.t += dtReal; if (S.frogCorpse.t > 1.4) S.frogCorpse = null; }
-    if (S.frogText) { S.frogText.t += dtReal; if (S.frogText.t > 0.9) S.frogText = null; }
+    if (S.frogText) { S.frogText.t += dtReal; if (S.frogText.t > (S.frogText.warn ? 2.2 : 0.9)) S.frogText = null; }
     var sdt = dtReal * (S.slowmo > 0 ? 0.3 : 1);
     S.runT += sdt;
     S.acc += sdt;
@@ -1504,6 +1527,15 @@
       var ty = ft.y - ft.t * 150;
       ctx.strokeText('呱——!!', ft.x, ty);
       ctx.fillText('呱——!!', ft.x, ty);
+      if (ft.warn && ft.t > 0.5) {
+        ctx.globalAlpha = Math.max(0, Math.min(1, (ft.t - 0.5) / 0.35)) * Math.max(0, Math.min(1, (2.2 - ft.t) / 0.4));
+        ctx.font = '800 30px sans-serif';
+        ctx.lineWidth = 6;
+        ctx.strokeStyle = 'rgba(21,27,40,0.85)';
+        ctx.fillStyle = '#a8e6f0';
+        ctx.strokeText(ft.warn, ft.x, ft.y + 56);
+        ctx.fillText(ft.warn, ft.x, ft.y + 56);
+      }
       ctx.restore();
     }
     /* 命中飘字：小而快（m3u，补上 m3r 漏掉的绘制） */
@@ -1677,8 +1709,28 @@
     if (gDebug) drawDebug();
   }
 
+  /* D4 坝面警示：从"光靠掉就能砸死自己"的那层起，承击面画成冷色硬边 + 下齿裂纹。
+     红线（m3u）：不画大圈、不盖半透明物——警示必须是坝自身长出来的样子 */
+  function drawBlockDanger(l, r, y) {
+    var w = r - l, i;
+    ctx.strokeStyle = '#a8e6f0';
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(l, y - 1); ctx.lineTo(r, y - 1); ctx.stroke();
+    ctx.strokeStyle = 'rgba(168,230,240,0.8)';
+    ctx.lineWidth = 2.5;
+    for (i = 0; i < 5; i++) {
+      var cx = l + w * ((i + 0.5) / 5);
+      if (Math.abs(cx - (l + r) * 0.5) < w * 0.14) continue;
+      ctx.beginPath();
+      ctx.moveTo(cx, y + 3);
+      ctx.lineTo(cx - 4, y + 16);
+      ctx.stroke();
+    }
+  }
+
   function drawBlock(b) {
     var l = shaftL(b.y), r = shaftR(b.y);
+    var hot = CFG.T_HARDLAND && floorOf(b.y) >= firstLethalFloor();
     if (IMG.block) {
       ctx.drawImage(IMG.block, l - 12, b.y - 9, r - l + 24, CFG.BLOCK_THICK + 18);
       var dmg = 1 - b.hp / b.maxHp;
@@ -1699,6 +1751,7 @@
       ctx.textAlign = 'center';
       ctx.fillText(String(Math.max(1, Math.ceil(b.hp))), (l + r) * 0.5, b.y + 31);
       ctx.textAlign = 'left';
+      if (hot) drawBlockDanger(l, r, b.y);
       return;
     }
     ctx.fillStyle = '#7d5c36';
@@ -1722,6 +1775,7 @@
     ctx.textAlign = 'center';
     ctx.fillText(String(b.hp), (l + r) * 0.5, b.y + 31);
     ctx.textAlign = 'left';
+    if (hot) drawBlockDanger(l, r, b.y);
   }
 
   function drawSpike(sp) {
@@ -2295,22 +2349,42 @@
       ctx.font = '800 22px sans-serif';
       ctx.fillText('颊囊空了！', CFG.LOGICAL_W - 150, ay + 4);
     }
-    /* 下落速度表：硬着陆是"看不见的红线"，先把速度本身给出来（阈值怎么算等 D4 定） */
+    /* 下落速度表（D4）：固定量程 + 两根会动的刻度。
+       亮红刻度=当前判死线（泄洪时整根右移），暗色刻度=你正常能掉到的最快速度。
+       暗线越到亮线右边＝红区出现＝"光靠掉就能把自己砸死"，此后砸坝是算得出的死法。 */
     var ggW = 158, ggH = 14, ggX = CFG.LOGICAL_W - 20 - ggW, ggY = VIEW.h - 54;
-    var ggDanger = CFG.T_HARDLAND ? CFG.HARD_LAND_SPEED : 1e9;
+    var ggMax = CFG.HARD_LAND_SPEED * CFG.FLUSH_BOOST_MULT;
+    var ggLine = CFG.T_HARDLAND ? hardLandLine() : 1e9;
+    var ggCap = fallCapBase();
     var ggV = P.vy > 0 ? P.vy : 0;
+    var ggDead = CFG.T_HARDLAND && P.vy >= ggLine;
+    var ggOver = CFG.T_HARDLAND && ggCap > ggLine;
+    var ggCapX = ggX + ggW * Math.min(1, ggCap / ggMax);
+    var ggLineX = ggX + ggW * Math.min(1, ggLine / ggMax);
     ctx.fillStyle = 'rgba(255,255,255,0.16)';
     ctx.fillRect(ggX, ggY, ggW, ggH);
-    ctx.fillStyle = P.vy >= ggDanger ? '#ff5b52' : (P.vy > ggDanger * 0.72 ? '#e8b23a' : '#8fb6c9');
-    ctx.fillRect(ggX, ggY, ggW * Math.min(1, ggV / ggDanger), ggH);
+    if (ggOver) {
+      ctx.fillStyle = 'rgba(217,83,79,0.5)';
+      ctx.fillRect(ggLineX, ggY, ggCapX - ggLineX, ggH);
+    }
+    ctx.fillStyle = ggDead ? '#ff5b52' : (ggOver ? '#e8b23a' : '#8fb6c9');
+    ctx.fillRect(ggX, ggY, ggW * Math.min(1, ggV / ggMax), ggH);
+    ctx.strokeStyle = 'rgba(242,234,216,0.62)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(ggCapX, ggY - 4); ctx.lineTo(ggCapX, ggY + ggH + 4); ctx.stroke();
+    if (CFG.T_HARDLAND) {
+      ctx.strokeStyle = '#ff5b52';
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(ggLineX, ggY - 4); ctx.lineTo(ggLineX, ggY + ggH + 4); ctx.stroke();
+    }
     ctx.strokeStyle = 'rgba(0,0,0,0.45)';
     ctx.lineWidth = 1.5;
     ctx.strokeRect(ggX + 0.5, ggY + 0.5, ggW - 1, ggH - 1);
     ctx.font = '800 15px sans-serif';
     ctx.textAlign = 'right';
-    ctx.fillStyle = P.vy >= ggDanger ? '#ff5b52' : 'rgba(242,234,216,0.82)';
-    ctx.fillText(P.vy > 0 ? ('下落 ' + Math.round(P.vy) + (P.vy >= ggDanger ? ' 会摔伤' : '')) : '上升',
-      CFG.LOGICAL_W - 20, ggY - 8);
+    ctx.fillStyle = ggDead ? '#ff5b52' : (ggOver ? '#e8b23a' : 'rgba(242,234,216,0.82)');
+    ctx.fillText(P.vy > 0 ? ('下落 ' + Math.round(P.vy) + (ggDead ? ' 会摔伤' : (ggOver ? ' 快到线' : ''))) : '上升',
+      CFG.LOGICAL_W - 20, ggY - 10);
     ctx.textAlign = 'left';
     /* Boss 血条：从它上面一层就开始显示，否则玩家看不见这条血存在＝打不掉血的错觉 */
     var hudBoss = floorAt(CFG.TOTAL_FLOORS).boss;
@@ -2326,6 +2400,7 @@
       '血档 ' + gTier + (gTier === 1 ? ' 3血' : (gTier === 2 ? ' 2血' : ' 1血')),
       '实体 弹' + ents + ' 粒' + countLive(S.particles),
       'vy ' + P.vy.toFixed(0) + ' vx ' + P.vx.toFixed(0),
+      '摔伤线' + Math.round(hardLandLine()) + ' 上限' + Math.round(fallCapBase()) + ' 起' + firstLethalFloor() + '层',
       'x ' + P.x.toFixed(0) + ' 层' + P.floor + ' 最深' + P.deepest,
       '弹' + P.ammo + '/' + CFG.AMMO_MAX + ' 射出' + S.shots,
       '水线 ' + (S.waterOn ? S.waterY.toFixed(0) : '未触发') + ' 停留' + P.dwell.toFixed(1) + 's',
@@ -2353,7 +2428,7 @@
     '触吊灯虫': '被吊灯虫的黏光圈粘了一下，湿着回来了',
     '被看天蛙闷了一口': '打盹的看天蛙忽然闭了嘴——它只是先来的',
     '蹭壁刺': '蹭上壁刺，湿着被冲回井口',
-    '硬着陆': '一头砸在堵层上，震得颊囊都散了',
+    '硬着陆': '掉得太快，一头砸在堵层上（速度条压过了红线）',
     '被潭水漫过': '潭水漫过了它的爪子，把它送回了井口',
     '被蛙喷的石子砸中': '看天蛙喷的石子把它砸了回来'
   };
