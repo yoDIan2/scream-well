@@ -340,7 +340,7 @@
   }
 
   /* ===================== 状态 ===================== */
-  var VER = 'm4r';
+  var VER = 'm4s';
   var S = null;
   var P = null;
   var gTier = 3;   // 血量档：1=3血(简单) 2=2血(标准) 3=1血(困难)；本版默认 1 血交付手感
@@ -588,7 +588,11 @@
         phase: 1, sp: 0, wstate: 'idle', wt: 0, drains: 0
       };
       f.stones = [];
-      f.pickups.push(mkPickup(top + 240, rnd, 'bag'));
+      /* 起手 3 袋：阶段一约 15 发 + 第一次涨水循环约 31 发 = 46 发，40 发撑不过去
+         （吐籽要等退水才给），所以补给必须开局就摆在层里，而不是等玩家自己挣 */
+      f.pickups.push(mkPickup(top + 200, rnd, 'bag'));
+      f.pickups.push(mkPickup(top + 460, rnd, 'bag'));
+      f.pickups.push(mkPickup(top + 700, rnd, 'bag'));
       return f;
     }
 
@@ -814,6 +818,7 @@
   }
 
   function endRun(cause) {
+    if (S.over) return;   // 幂等：回放水线就设在脚下，同一步的潭水判定会再调一次，会把真死因覆盖成"被潭水漫过"
     S.over = true;
     S.win = false;
     S.cause = cause;
@@ -1018,10 +1023,11 @@
           bs2.t = 0;
           bs2.open = !bs2.open;
           if (!bs2.open) {
+            /* 喷水改到闭嘴瞬间：跟着嘴走的玩家正好在喷口正上方，张嘴喷＝输出窗口即死亡窗口
+               （实测 3 道水柱 5 秒打死 3 血档）。闭嘴喷之后，张嘴纯输出、闭嘴纯躲，两个窗口不再抢注意力 */
+            bossSpit(bs2, f, bs2.phase >= 2 ? 4 : 3);
             if (Math.abs(P.x - bs2.mouthCx) < CFG.BOSS_MOUTH_W * 0.5 &&
                 P.y + P.r > bs2.y - 40 && P.y < bs2.y + 12 && !wallGrace()) hurt('被漫堤鱼闷了一口', true);
-          } else if (bs2.wstate !== 'hold') {
-            bossSpit(bs2, f, bs2.phase >= 2 ? 4 : 3);
           }
         }
         bs2.openness += ((bs2.open ? 1 : 0) - bs2.openness) * Math.min(1, 9 * dt);
@@ -1230,10 +1236,11 @@
         floatText(bu.x, bu.y - 10, '闭嘴', '#cfd6e2');
         continue;
       }
-      /* 井底 Boss：弱点＝游动的嘴心；吃完整伤害加成（蛙那套固定 -1 让攻击卡在蛙层白买，这里不重复） */
+      /* 井底 Boss：弱点＝游动的嘴心；吃完整伤害加成（蛙那套固定 -1 让攻击卡在蛙层白买，这里不重复）
+         纵向给一条竖通道而不是横线：玩家贴着它背时籽从嘴下方出发，横线判定是完全隐形的死区 */
       if (bf.boss && bf.boss.alive && bf.boss.open && bf.boss.openness > 0.5) {
         var bmY = bf.boss.y - 40;
-        if (Math.abs(bu.y - bmY) < 34 &&
+        if (bu.y > bf.boss.y - 110 && bu.y < bf.boss.y + 30 &&
             Math.abs(bu.x - bf.boss.mouthCx) < CFG.BOSS_MOUTH_W * 0.5 * (1 + 0.2 * lvl('eye') + lineBonus('aim'))) {
           bu.live = false;
           bf.boss.hp -= bu.dmg;
@@ -1255,12 +1262,20 @@
           }
           continue;
         }
-      } else if (bf.boss && bf.boss.alive &&
-          Math.abs(bu.y - (bf.boss.y - 40)) < 34 &&
-          Math.abs(bu.x - bf.boss.mouthCx) < CFG.BOSS_MOUTH_W * 0.5) {
+      }
+      /* 躯干吞弹：不挡就变成"打在鱼身上却没反应"，玩家无法理解只有嘴算 */
+      if (bf.boss && bf.boss.alive && bu.y > bf.boss.y - 74 && bu.y < bf.boss.y + 62) {
         bu.live = false;
-        burst(bu.x, bu.y, 2, '#cfd6e2', 70);
-        floatText(bu.x, bu.y - 10, '闭嘴', '#cfd6e2');
+        if (Math.abs(bu.x - bf.boss.mouthCx) < CFG.BOSS_MOUTH_W * 0.5) {
+          burst(bu.x, bu.y, 2, '#cfd6e2', 70);
+          floatText(bu.x, bu.y - 10, '闭嘴', '#cfd6e2');
+        } else {
+          burst(bu.x, bu.y, 3, '#3c5f74', 90);
+          if (!bf.boss.bodyTold) {
+            bf.boss.bodyTold = true;
+            floatText(bu.x, bu.y - 14, '身子打不动，对准嘴', '#cfd6e2');
+          }
+        }
         continue;
       }
       if (bf.fish && bf.fish.alive) {
@@ -1944,9 +1959,9 @@
       ctx.globalCompositeOperation = 'source-over';
     }
     ctx.restore();
-    drawBossBar(bs);
   }
 
+  /* 血条必须在相机变换之外画（原先放在 drawBoss 里，被 translate(0,-camY) 抬到屏幕外，谁也看不见） */
   function drawBossBar(bs) {
     if (!bs.alive) return;
     var bw = Math.min(300, CFG.LOGICAL_W - 80);
@@ -2134,6 +2149,9 @@
       ctx.font = '800 22px sans-serif';
       ctx.fillText('颊囊空了！', CFG.LOGICAL_W - 150, ay + 4);
     }
+    /* Boss 血条：从它上面一层就开始显示，否则玩家看不见这条血存在＝打不掉血的错觉 */
+    var hudBoss = floorAt(CFG.TOTAL_FLOORS).boss;
+    if (hudBoss.alive && P.floor >= CFG.TOTAL_FLOORS - 1) drawBossBar(hudBoss);
   }
 
   function drawDebug() {
@@ -2852,11 +2870,12 @@
         }
         /* god 只对几何障碍开火（坝/蛙嘴），不陪鱼虫耗弹药——可解性探针语义（m3y） */
         if (f.frog && f.frog.alive && f.frog.open && Math.abs(P.x - shaftCx(f.frog.y)) < 70) wantFire = true;   // m3y：对准嘴才开火，省弹药
-        /* m4o 井底 Boss：张嘴才输出；水挡在嘴边或追上脚底时改为连续开火逃命（开火＝唯一升力） */
+        /* m4o 井底 Boss：张嘴才输出；水挡在嘴边或追上脚底时改为连续开火逃命（开火＝唯一升力）
+           距离闸门必须有：籽出视口底即删，实际射程约 400px，远了开火等于白扔 */
         if (f.boss && f.boss.alive) {
           var bMouthY = f.boss.y - 40;
           if ((S.waterOn && (S.waterY < bMouthY || P.y + P.r > S.waterY - 300)) ||
-              (!S.waterOn && f.boss.open && f.boss.openness > 0.6)) wantFire = true;
+              (!S.waterOn && f.boss.open && f.boss.openness > 0.6 && f.boss.y - P.y < 380)) wantFire = true;
         }
       }
       /* m3y：参考 bot 走位——蛙在下方朝嘴心对齐；弹药紧张时朝最近拾取横移（仅模拟器） */
