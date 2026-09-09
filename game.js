@@ -343,13 +343,14 @@
   }
 
   /* ===================== 状态 ===================== */
-  var VER = 'm4x';
+  var VER = 'm4y';
   var S = null;
   var P = null;
   var gTier = 3;   // 血量档：1=3血(简单) 2=2血(标准) 3=1血(困难)；本版默认 1 血交付手感
   var gDebug = false;
   var gBossJump = false;   // ?boss=1：开局直接落到井底 Boss 面前，省掉手动跳 99 层
   var gAttract = true;   // 首页期间：井画着但物理不推进（潭水钟也不走）
+  var gPaused = false;   // 暂停：同样只冻结 update，渲染照常
   var fps = 60, fpsAcc = 0, fpsN = 0;
 
   function todayKey() {
@@ -2477,6 +2478,8 @@
       ' · 井宽在最深处 ' + Math.round(shaftW(P.deepest * CFG.FLOOR_H)) + 'px' + bLine +
       '\n纪录 ' + gSave.deepest + ' 层 · 今日第 ' + gSave.todayTries + ' 次 · 累计 ' + gSave.totalRuns + ' 局';
     elResMeta.textContent = meta;
+    document.getElementById('result-card').className = S.win ? 'win' : '';   // 通关卡与死亡卡视觉分开
+    setPauseChip(false);
     elHint.textContent = gTier === 1
       ? '简单档：能错三次，用来熟悉走位和缺口'
       : (gTier === 2
@@ -2592,8 +2595,8 @@
   resBtns[0].addEventListener('click', function () { setTier(1); });
   resBtns[1].addEventListener('click', function () { setTier(2); });
   resBtns[2].addEventListener('click', function () { setTier(3); });
-  document.getElementById('btn-restart').addEventListener('click', function () { newRun(); });
-  document.getElementById('btn-again').addEventListener('click', function () { newRun(); });
+  document.getElementById('btn-restart').addEventListener('click', function () { newRun(); setPauseChip(true); });
+  document.getElementById('btn-again').addEventListener('click', function () { newRun(); setPauseChip(true); });
   document.getElementById('btn-jump').addEventListener('click', function () { jumpFloors(10); });
   var elBossBtn = document.getElementById('btn-boss');
   if (elBossBtn) elBossBtn.addEventListener('click', dropToBoss);   // 旧 HTML 缓存里没这个按钮：绝不能因此中断启动
@@ -2651,8 +2654,43 @@
     gAttract = false;
     elHome.className = 'hidden';
     newRun();
+    setPauseChip(true);
   });
   elMute.addEventListener('click', toggleAudio);
+
+  /* ===================== m4y 暂停与操作说明 ===================== */
+  var elPause = document.getElementById('pause');
+  var elPauseBtn = document.getElementById('btn-pause');
+  var elHowto = document.getElementById('howto');
+
+  function setPauseChip(on) {
+    if (elPauseBtn) elPauseBtn.className = on ? '' : 'hidden';
+  }
+  setPauseChip(false);   // 首页期间不露暂停钮
+
+  if (elPauseBtn) elPauseBtn.addEventListener('click', function () {
+    if (gAttract || S.over) return;
+    gPaused = true;
+    elPause.className = '';
+    setPauseChip(false);
+  });
+  document.getElementById('btn-resume').addEventListener('click', function () {
+    gPaused = false;
+    elPause.className = 'hidden';
+    setPauseChip(true);
+  });
+  document.getElementById('btn-menu').addEventListener('click', function () {
+    gPaused = false;
+    elPause.className = 'hidden';
+    gAttract = true;
+    newRun();            // 放弃的这一局不计成绩，重开只为让首页身后的井是干净的
+    fillHome();
+    syncTierBtns();
+    elHome.className = '';
+    setPauseChip(false);
+  });
+  document.getElementById('btn-howto').addEventListener('click', function () { elHowto.className = ''; });
+  document.getElementById('btn-howto-close').addEventListener('click', function () { elHowto.className = 'hidden'; });
 
   /* 三击版本号＝开调试条：手机上改 URL 麻烦，而调试条是 m4i 自己藏起来的（只在 ?debug=1 显示）
      计时用 Date.now()——首页期间物理不推进，S.animT 是冻住的 */
@@ -2803,6 +2841,7 @@
       }
     }
     elPick3.className = '';
+    setPauseChip(false);
   }
 
   function applyPick(id) {
@@ -2822,6 +2861,7 @@
     }
     S.pick3 = null;
     elPick3.className = 'hidden';
+    setPauseChip(true);
   }
 
   /* 事件触发式尖叫：只在受击（未死）与死亡时出声；低调、干声、轻微毛边 */
@@ -3148,7 +3188,7 @@
     fpsAcc += dt; fpsN++;
     if (fpsAcc >= 0.5) { fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; }
 
-    if (gAttract) { render(); return; }
+    if (gAttract || gPaused) { render(); return; }
     update(dt);
     render();
   }

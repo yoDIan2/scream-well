@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>尖叫之井 · M0-a 手感对比原型</title>
-<link rel="stylesheet" href="./style.css?v=m4x">
+<link rel="stylesheet" href="./style.css?v=m4y">
 </head>
 <body>
 <div id="proto-bar">
-  <span id="proto-tag">m4x</span>
+  <span id="proto-tag">m4y</span>
   <button type="button" class="xb" id="btn-bar-min">收起</button>
   <button type="button" class="xb" id="btn-x1">3血</button>
   <button type="button" class="xb" id="btn-x2">2血</button>
@@ -27,6 +27,7 @@
 <div id="stage">
   <canvas id="cv"></canvas>
 </div>
+<button type="button" id="btn-pause">暂停</button>
 <div id="home">
   <div id="home-inner">
     <div id="home-kicker">王国史 · 第二章</div>
@@ -38,7 +39,31 @@
     </div>
     <button type="button" id="btn-start">下井</button>
     <div id="home-stat"></div>
-    <div id="home-foot"><span id="home-ver"></span><button type="button" id="btn-mute">音频:开</button></div>
+    <div id="home-foot">
+      <span id="home-ver"></span>
+      <button type="button" id="btn-howto">怎么玩</button>
+      <button type="button" id="btn-mute">音频:开</button>
+    </div>
+  </div>
+</div>
+<div id="howto" class="hidden">
+  <div id="howto-card">
+    <div id="howto-title">怎么玩</div>
+    <div class="hl"><b>按住左／右侧</b><span>往那边走，同时往下吐籽</span></div>
+    <div class="hl"><b>吐籽的后坐力</b><span>是你唯一的升力</span></div>
+    <div class="hl"><b>坝</b><span>挡住去路，打穿它才能下</span></div>
+    <div class="hl"><b>壁刺和住户</b><span>碰一下就掉血，1 血档碰一下就死</span></div>
+    <div class="hl"><b>潭水</b><span>在你脚下涨，漫到就回井口</span></div>
+    <div class="hl"><b>每 10 层</b><span>三选一，选一张会烧掉一张</span></div>
+    <div class="hl"><b>井底</b><span>暗河里有东西，打穿它才算通关</span></div>
+    <button type="button" id="btn-howto-close">知道了</button>
+  </div>
+</div>
+<div id="pause" class="hidden">
+  <div id="pause-card">
+    <div id="pause-title">停一下</div>
+    <button type="button" id="btn-resume">继续下井</button>
+    <button type="button" id="btn-menu">返回主菜单</button>
   </div>
 </div>
 <div id="result" class="hidden">
@@ -70,6 +95,6 @@
     <div id="pick3-hint">点一张带走 · 另两张里会烧掉一张，本局不再出现</div>
   </div>
 </div>
-<script src="./game.js?v=m4x"></script>
+<script src="./game.js?v=m4y"></script>
 </body>
 </html>
