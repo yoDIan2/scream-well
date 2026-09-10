@@ -158,6 +158,12 @@ html, body {
   border-top: 1px solid #2b3038;
 }
 
+/* 刚弹出的 1 秒防误触：状态要看得见，否则像卡死 */
+#result-menu.lock,
+#share-btns.lock {
+  opacity: 0.4;
+}
+
 #btn-again {
   display: block;
   width: 100%;

@@ -102,6 +102,7 @@
     MAGNET_PULL: 9,         // 磁吸强度（每秒）
     HARD_LAND_SPEED: 1050,  // 落地速度超过此值 = 扣血
     SOFT_LAND_SPEED: 650,   // 超过此值 = 大弹开（不扣血）
+    RESULT_LOCK_MS: 1000,   // 结算卡刚弹出的防误触时长：手指还在连点时会误开"主菜单"
     MEGA_VY: 900,           // 扩音器判定速度：下落上限=900+4×层，取 900 才可能在浅层触发（m4l）
     WIND_ACC: 900,          // 追风籽横向转向加速度（原 320：整段飞行只偏 48px，看不见）
     WIND_VX_MAX: 420,       // 追风籽横向速度上限（原 240）
@@ -387,7 +388,7 @@
   }
 
   /* ===================== 状态 ===================== */
-  var VER = 'm59';
+  var VER = 'm60';
   /* 上架开关：源码里恒为 false（我和他在手机上都要靠调试条校准），
      build.mjs 打进包时把副本改成 true —— 一包之内所有开发入口一起关掉：
      URL 参数、调试浮层、键盘 d/r、首页三击版本号开调试条。 */
@@ -2732,7 +2733,7 @@
     }
     var mt = window.xhs && window.xhs.miniTool;
     if (mt) {
-      elShareBtns.className = '';
+      elShareBtns.className = gResultLocked ? 'lock' : '';
       setShareStatus('');
     } else {
       setShareStatus('长按图片可保存');
@@ -2765,7 +2766,26 @@
       elResText.className = '';            // 图 60ms 后才生成好，先用文字兜住
     }
     elResult.className = '';
+    lockResultMenu();
     setTimeout(buildShareAssets, 60);
+  }
+
+  /* 防误触：死/通关那一刻手指还在连点屏幕，头 1 秒点到的往往是"主菜单"（卡片直接关掉）。
+     用类名变灰 + JS 吞掉点击，不用 pointer-events——那会让点击穿透到画面里。 */
+  var gResultLocked = false, gResultLockT = 0;
+  function lockResultMenu() {
+    gResultLocked = true;
+    gResultLockT++;
+    var menu = document.getElementById('result-menu');
+    if (menu) menu.className = 'lock';
+    if (hasShareDom) elShareBtns.className = 'hidden lock';
+    var my = gResultLockT;
+    setTimeout(function () {
+      if (gResultLockT !== my) return;      // 期间又开了一张新卡：让新的那次去解除
+      gResultLocked = false;
+      if (menu) menu.className = '';
+      if (hasShareDom && S.reportData) elShareBtns.className = '';
+    }, CFG.RESULT_LOCK_MS);
   }
 
   function syncTierBtns() {
@@ -2867,7 +2887,7 @@
   barBtns[1].addEventListener('click', function () { setTier(2); });
   barBtns[2].addEventListener('click', function () { setTier(3); });
   document.getElementById('btn-restart').addEventListener('click', function () { newRun(); setPauseChip(true); });
-  document.getElementById('btn-again').addEventListener('click', function () { newRun(); setPauseChip(true); });
+  document.getElementById('btn-again').addEventListener('click', function () { if (gResultLocked) return; newRun(); setPauseChip(true); });
   document.getElementById('btn-jump').addEventListener('click', function () { jumpFloors(10); });
   var elBossBtn = document.getElementById('btn-boss');
   if (elBossBtn) elBossBtn.addEventListener('click', dropToBoss);   // 旧 HTML 缓存里没这个按钮：绝不能因此中断启动
@@ -2923,8 +2943,8 @@
   }
   var btnAlbum = document.getElementById('btn-album');
   var btnNote = document.getElementById('btn-note');
-  if (btnAlbum) btnAlbum.addEventListener('click', shareAlbum);
-  if (btnNote) btnNote.addEventListener('click', shareNote);
+  if (btnAlbum) btnAlbum.addEventListener('click', function () { if (!gResultLocked) shareAlbum(); });
+  if (btnNote) btnNote.addEventListener('click', function () { if (!gResultLocked) shareNote(); });
 
   /* ===================== 首页 ===================== */
   function fillHome() {
@@ -2980,7 +3000,7 @@
   var elBtnMenu = document.getElementById('btn-menu');
   var elBtnHome = document.getElementById('btn-home');
   if (elBtnMenu) elBtnMenu.addEventListener('click', goHome);
-  if (elBtnHome) elBtnHome.addEventListener('click', goHome);
+  if (elBtnHome) elBtnHome.addEventListener('click', function () { if (!gResultLocked) goHome(); });
   document.getElementById('btn-howto').addEventListener('click', function () { elHowto.className = ''; });
   document.getElementById('btn-howto-close').addEventListener('click', function () { elHowto.className = 'hidden'; });
 
