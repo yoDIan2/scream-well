@@ -362,7 +362,7 @@
   }
 
   /* ===================== 状态 ===================== */
-  var VER = 'm55';
+  var VER = 'm56';
   var S = null;
   var P = null;
   var gTier = 3;   // 血量档：1=3血(简单) 2=2血(标准) 3=1血(困难)；本版默认 1 血交付手感
@@ -2634,10 +2634,11 @@
     return c.toDataURL('image/jpeg', 0.86);
   }
 
-  function setShareStatus(t) { elShareStatus.textContent = t; }
+  var hasShareDom = !!(elReportImg && elShareBtns && elShareStatus);
+  function setShareStatus(t) { if (hasShareDom) elShareStatus.textContent = t; }
 
   function shareFallback() {
-    if (!S.reportData) return;
+    if (!S.reportData || !hasShareDom) return;
     elReportImg.src = S.reportData;
     elReportImg.className = '';
     setShareStatus('长按图片可保存');
@@ -2676,7 +2677,7 @@
     try {
       S.reportData = buildReportCard();
       var mt = window.xhs && window.xhs.miniTool;
-      if (mt) {
+      if (mt && hasShareDom) {
         elShareBtns.className = '';
         setShareStatus('');
       } else {
@@ -2710,9 +2711,11 @@
         ? '标准档：两下就没'
         : '困难档：碰到就没——走位就是命');
     syncTierBtns();
-    elShareBtns.className = 'hidden';
-    elReportImg.className = 'hidden';
-    elShareStatus.textContent = '';
+    if (hasShareDom) {
+      elShareBtns.className = 'hidden';
+      elReportImg.className = 'hidden';
+      elShareStatus.textContent = '';
+    }
     elResult.className = '';
     setTimeout(buildShareAssets, 60);
   }
@@ -2857,11 +2860,16 @@
     bar.className = mins ? '' : 'min';
     elBarMin.textContent = mins ? '收起' : '展开';
   });
-  p3Btns[0].addEventListener('click', function () { if (S.pick3) applyPick(S.pick3.offers[0].id); });
-  p3Btns[1].addEventListener('click', function () { if (S.pick3) applyPick(S.pick3.offers[1].id); });
-  p3Btns[2].addEventListener('click', function () { if (S.pick3) applyPick(S.pick3.offers[2].id); });
-  document.getElementById('btn-album').addEventListener('click', shareAlbum);
-  document.getElementById('btn-note').addEventListener('click', shareNote);
+  for (var p3i = 0; p3i < p3Btns.length; p3i++) {
+    if (!p3Btns[p3i]) continue;
+    (function (idx) {
+      p3Btns[idx].addEventListener('click', function () { if (S.pick3) applyPick(S.pick3.offers[idx].id); });
+    })(p3i);
+  }
+  var btnAlbum = document.getElementById('btn-album');
+  var btnNote = document.getElementById('btn-note');
+  if (btnAlbum) btnAlbum.addEventListener('click', shareAlbum);
+  if (btnNote) btnNote.addEventListener('click', shareNote);
 
   /* ===================== 首页 ===================== */
   function fillHome() {
