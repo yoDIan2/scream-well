@@ -24,6 +24,7 @@
     /* 顶部让位：env() 只给刘海/状态栏，容器自己那条导航（返回/人/分享）不在里面。
        48 = iPhone 13 截图推算（容器图标中心约在 68 CSS px，图标列高约 48）；?bar= 可改 */
     UI_CONTAINER_BAR: 48,
+    UI_TOP_MIN_CSS: 24,    // App 内 env 读不到时的下限（状态栏尺寸）：老安卓不认 env()
     UI_TOP_MIN: 12,
 
     GRAVITY: 2400,
@@ -307,7 +308,11 @@
     if (cssW === undefined) cssW = cv.getBoundingClientRect().width;
     if (!elSafeProbe) elSafeProbe = document.getElementById('safe-probe');
     gTopEnv = elSafeProbe ? (parseFloat(window.getComputedStyle(elSafeProbe).paddingTop) || 0) : 0;
-    gTopBar = (window.xhs && window.xhs.miniTool) ? (gBarOverride >= 0 ? gBarOverride : CFG.UI_CONTAINER_BAR) : 0;
+    var inApp = !!(window.xhs && window.xhs.miniTool);
+    /* Chrome 61 不认 env()，老安卓上探针会读到 0。他没有安卓设备可测，所以这里宁可多让：
+       App 内 env 读数低于下限就按下限算，绝不把 HUD 顶回状态栏里 */
+    if (inApp && gTopEnv < CFG.UI_TOP_MIN_CSS) gTopEnv = CFG.UI_TOP_MIN_CSS;
+    gTopBar = inApp ? (gBarOverride >= 0 ? gBarOverride : CFG.UI_CONTAINER_BAR) : 0;
     var perCss = cssW > 0 ? CFG.LOGICAL_W / cssW : 1;
     var css = gTopEnv + gTopBar;
     gTopLogical = gTopOverride >= 0 ? gTopOverride : Math.round(Math.max(CFG.UI_TOP_MIN, css) * perCss);
@@ -382,7 +387,7 @@
   }
 
   /* ===================== 状态 ===================== */
-  var VER = 'm57';
+  var VER = 'm58';
   var S = null;
   var P = null;
   var gTier = 3;   // 血量档：1=3血(简单) 2=2血(标准) 3=1血(困难)；本版默认 1 血交付手感
