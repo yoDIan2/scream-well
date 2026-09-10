@@ -387,7 +387,11 @@
   }
 
   /* ===================== 状态 ===================== */
-  var VER = 'm58';
+  var VER = 'm59';
+  /* 上架开关：源码里恒为 false（我和他在手机上都要靠调试条校准），
+     build.mjs 打进包时把副本改成 true —— 一包之内所有开发入口一起关掉：
+     URL 参数、调试浮层、键盘 d/r、首页三击版本号开调试条。 */
+  var G_RELEASE = false;
   var S = null;
   var P = null;
   var gTier = 3;   // 血量档：1=3血(简单) 2=2血(标准) 3=1血(困难)；本版默认 1 血交付手感
@@ -404,6 +408,7 @@
   }
 
   function parseUrlOpts() {
+    if (G_RELEASE) return;   // 上架包：所有开发用 URL 参数一律无效
     var params = (window.location.search || '');
     if (params.indexOf('debug=1') >= 0) gDebug = true;
     if (params.indexOf('boss=1') >= 0) gBossJump = true;
@@ -1744,7 +1749,7 @@
       ctx.fillText('被冲回井口——', CFG.LOGICAL_W / 2, 140);
       ctx.textAlign = 'left';
     }
-    if (gDebug) drawDebug();
+    if (gDebug && !G_RELEASE) drawDebug();
   }
 
   /* D4 坝面警示：从"光靠掉就能砸死自己"的那层起，承击面画成冷色硬边 + 下齿裂纹。
@@ -2825,10 +2830,10 @@
     else if (k === '1') setTier(1);
     else if (k === '2') setTier(2);
     else if (k === '3') setTier(3);
-    else if (k === 'r' || k === 'R') newRun();
-    else if (k === 'd' || k === 'D') { gDebug = !gDebug; }
-    else if (k === 'j' || k === 'J') jumpFloors(10);
-    else if (k === 'f' || k === 'F') { if (!S.waterOn) triggerFlood(); }
+    else if (!G_RELEASE && (k === 'r' || k === 'R')) newRun();
+    else if (!G_RELEASE && (k === 'd' || k === 'D')) { gDebug = !gDebug; }
+    else if (!G_RELEASE && (k === 'j' || k === 'J')) jumpFloors(10);
+    else if (!G_RELEASE && (k === 'f' || k === 'F')) { if (!S.waterOn) triggerFlood(); }
   });
   window.addEventListener('keyup', function (e) {
     if (e.key === ' ' || e.key === 'Spacebar') S.firing = false;
@@ -2983,6 +2988,7 @@
      计时用 Date.now()——首页期间物理不推进，S.animT 是冻住的 */
   var dbgTaps = 0, dbgTapAt = 0;
   document.getElementById('home-ver').addEventListener('click', function () {
+    if (G_RELEASE) return;   // 上架包：三击版本号这个后门一并关掉
     var now = Date.now();
     if (now - dbgTapAt > 1500) dbgTaps = 0;
     dbgTapAt = now;
