@@ -4,11 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>尖叫之井</title>
-<link rel="stylesheet" href="./style.css?v=m56">
+<link rel="stylesheet" href="./style.css?v=m57">
 </head>
 <body>
+<div id="safe-probe" aria-hidden="true"></div>
 <div id="proto-bar">
-  <span id="proto-tag">m56</span>
+  <span id="proto-tag">m57</span>
   <button type="button" class="xb" id="btn-bar-min">收起</button>
   <button type="button" class="xb" id="btn-x1">3血</button>
   <button type="button" class="xb" id="btn-x2">2血</button>
@@ -23,6 +24,8 @@
   <button type="button" id="btn-t-hard">硬着陆</button>
   <button type="button" id="btn-t-fish">拦路蛛</button>
   <button type="button" id="btn-t-ammo">无限弹</button>
+  <button type="button" class="xb" id="btn-top-minus">顶距-</button>
+  <button type="button" class="xb" id="btn-top-plus">顶距+</button>
 </div>
 <div id="stage">
   <canvas id="cv"></canvas>
@@ -68,22 +71,25 @@
 </div>
 <div id="result" class="hidden">
   <div id="result-card">
-    <div id="result-title">被水冲回井口了</div>
-    <div id="result-depth">第 1 层</div>
-    <div id="result-meta"></div>
-    <div id="result-xbtns">
-      <button type="button" class="xb" id="rx1">3血</button>
-      <button type="button" class="xb" id="rx2">2血</button>
-      <button type="button" class="xb" id="rx3">1血</button>
+    <!-- 上半：分享卡。战报图就是结算主体，文字只在图没生成成功时兜底 -->
+    <div id="result-share">
+      <img id="report-img" class="hidden" alt="今日战报">
+      <div id="result-text" class="hidden">
+        <div id="result-title">被水冲回井口了</div>
+        <div id="result-depth">第 1 层</div>
+        <div id="result-meta"></div>
+      </div>
+      <div id="share-btns" class="hidden">
+        <button type="button" id="btn-album">存相册</button>
+        <button type="button" id="btn-note">发笔记</button>
+      </div>
+      <div id="share-status"></div>
     </div>
-    <button type="button" id="btn-again">再来一局</button>
-    <img id="report-img" class="hidden" alt="战报">
-    <div id="share-btns" class="hidden">
-      <button type="button" id="btn-album">存相册</button>
-      <button type="button" id="btn-note">发笔记</button>
+    <!-- 下半：菜单，竖排 -->
+    <div id="result-menu">
+      <button type="button" id="btn-again">再来一局</button>
+      <button type="button" id="btn-home">主菜单</button>
     </div>
-    <div id="share-status"></div>
-    <div id="result-hint">同一个 seed，三口井一模一样，只有横向控制不同</div>
   </div>
 </div>
 <div id="pick3" class="hidden">
@@ -95,6 +101,6 @@
     <div id="pick3-hint">点一张带走 · 另两张里会烧掉一张，本局不再出现</div>
   </div>
 </div>
-<script src="./game.js?v=m56"></script>
+<script src="./game.js?v=m57"></script>
 </body>
 </html>

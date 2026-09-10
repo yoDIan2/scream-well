@@ -21,6 +21,10 @@
     LOGICAL_W: 720,
     FLOOR_H: 1280,
     TOTAL_FLOORS: 99,
+    /* 顶部让位：env() 只给刘海/状态栏，容器自己那条导航（返回/人/分享）不在里面。
+       48 = iPhone 13 截图推算（容器图标中心约在 68 CSS px，图标列高约 48）；?bar= 可改 */
+    UI_CONTAINER_BAR: 48,
+    UI_TOP_MIN: 12,
 
     GRAVITY: 2400,
     FALL_CAP_BASE: 900,
@@ -114,8 +118,8 @@
     BOSS_SWAY: 96,           // 嘴心左右游的幅度——蛙钉在井心，它不固定
     BOSS_SWAY_SPD: 0.9,
     BOSS_Y_OFF: 980,         // 在井底层的悬挂位置（层顶往下）
-    BOSS_PHASE2: 0.66,       // 血量降到此比例开始吸水
-    BOSS_PHASE3: 0.33,       // 再降到此比例就只喷不吸（第二轮收尾）
+    BOSS_PHASE2: 0.85,       // 血量降到此比例开始吸水（原 0.66：满构筑 19 发就打死，水根本没涨过）
+    BOSS_PHASE3: 0.5,        // 再降到此比例就只喷不吸（第二轮收尾）
     BOSS_FILL: 650,          // 水线停在 boss 上方 650px：>籽的 400px 射程 ⇒ 物理上打不到
     BOSS_RISE_T: 7,          // 涨水 7 秒：水速必须低于玩家连射爬升速度 286px/s，否则涨水期必死（原 4 秒=237px/s 就是必死）
     BOSS_HOLD_T: 2.5,        // 停位 2.5 秒：悬停要 5.6 发/秒，原来 6 秒＝33 发，比一轮输出收益还贵
@@ -268,9 +272,8 @@
   var elResTitle = document.getElementById('result-title');
   var elResDepth = document.getElementById('result-depth');
   var elResMeta = document.getElementById('result-meta');
-  var elHint = document.getElementById('result-hint');
+  var elResText = document.getElementById('result-text');
   var barBtns = [document.getElementById('btn-x1'), document.getElementById('btn-x2'), document.getElementById('btn-x3')];
-  var resBtns = [document.getElementById('rx1'), document.getElementById('rx2'), document.getElementById('rx3')];
   var togBtns = [document.getElementById('btn-t-magnet'), document.getElementById('btn-t-hard'), document.getElementById('btn-t-fish')];
   var elPick3 = document.getElementById('pick3');
   var elHome = document.getElementById('home');
@@ -293,7 +296,24 @@
     VIEW.cw = cw; VIEW.ch = ch; VIEW.dpr = dpr;
     VIEW.scale = cw / CFG.LOGICAL_W;
     VIEW.h = ch / VIEW.scale;
+    measureTopInset(rect.width);
   }
+
+  /* 顶部让位量：刘海/状态栏靠探针读 env()，容器自己那条导航只在检测到桥时补常量。
+     浏览器里没有容器条，所以 Pages 测试站不会被莫名推下去。 */
+  var gTopEnv = 0, gTopBar = 0, gTopLogical = 0, gTopOverride = -1, gBarOverride = -1;
+  var elSafeProbe = null;
+  function measureTopInset(cssW) {
+    if (cssW === undefined) cssW = cv.getBoundingClientRect().width;
+    if (!elSafeProbe) elSafeProbe = document.getElementById('safe-probe');
+    gTopEnv = elSafeProbe ? (parseFloat(window.getComputedStyle(elSafeProbe).paddingTop) || 0) : 0;
+    gTopBar = (window.xhs && window.xhs.miniTool) ? (gBarOverride >= 0 ? gBarOverride : CFG.UI_CONTAINER_BAR) : 0;
+    var perCss = cssW > 0 ? CFG.LOGICAL_W / cssW : 1;
+    var css = gTopEnv + gTopBar;
+    gTopLogical = gTopOverride >= 0 ? gTopOverride : Math.round(Math.max(CFG.UI_TOP_MIN, css) * perCss);
+    if (elPauseBtn) elPauseBtn.style.top = (css + 14) + 'px';
+  }
+  function topInset() { return gTopLogical; }
 
   /* ===================== 井几何（连续函数，无层间接缝） ===================== */
   function shaftCx(y) { return CFG.LOGICAL_W * 0.5 + Math.sin(y * 0.00107) * 78; }
@@ -362,7 +382,7 @@
   }
 
   /* ===================== 状态 ===================== */
-  var VER = 'm56';
+  var VER = 'm57';
   var S = null;
   var P = null;
   var gTier = 3;   // 血量档：1=3血(简单) 2=2血(标准) 3=1血(困难)；本版默认 1 血交付手感
@@ -388,6 +408,10 @@
       var v = parseInt(params.charAt(mx + 2), 10);
       if (v === 1 || v === 2 || v === 3) gTier = v;
     }
+    var mt = params.indexOf('top=');
+    if (mt >= 0) gTopOverride = parseInt(params.slice(mt + 4), 10) || 0;
+    var mb = params.indexOf('bar=');
+    if (mb >= 0) gBarOverride = parseInt(params.slice(mb + 4), 10) || 0;
   }
 
   function newRun() {
@@ -607,8 +631,11 @@
     /* 井底层（99）：暗河的鱼独占。它的背＝玩家落脚点，所以它活着时落不到底＝不会提前通关 */
     if (n === CFG.TOTAL_FLOORS) {
       var by2 = top + CFG.BOSS_Y_OFF;
+      /* 血量随到达时的构筑上浮（和蛙同一口径），封顶 +12：弹药总量锁死在这一关内，
+         再加就撞上"涨水期爬不出去"那条算术红线 */
+      var bhp = CFG.BOSS_HP + Math.min(12, Math.round(atkLevels() * 1.5));
       f.boss = {
-        y: by2, hp: CFG.BOSS_HP, maxHp: CFG.BOSS_HP, alive: true,
+        y: by2, hp: bhp, maxHp: bhp, alive: true,
         open: true, t: 0, openness: 1, mouthCx: shaftCx(by2), hitT: -9,
         phase: 1, sp: 0, wstate: 'idle', wt: 0, drains: 0, rest: 0
       };
@@ -1289,6 +1316,12 @@
         if (bu.y > bf.boss.y - 110 && bu.y < bf.boss.y + 30 &&
             Math.abs(bu.x - bf.boss.mouthCx) < CFG.BOSS_MOUTH_W * 0.5 * (1 + 0.2 * lvl('eye') + lineBonus('aim'))) {
           bu.live = false;
+          if (bf.boss.wstate === 'warn' || bf.boss.wstate === 'rise') {
+            /* 吸水期无敌：它正把暗河往嘴里灌，这段时间打不动。浪费必须看得见 */
+            floatText(bu.x, bu.y - 10, '吸水中', '#7fb6d9');
+            burst(bu.x, bu.y, 3, '#7fb6d9', 90);
+            continue;
+          }
           bf.boss.hp -= bu.dmg;
           bf.boss.hitT = S.animT;
           floatText(bu.x, bmY - 24, '-' + bu.dmg, '#e8b23a');
@@ -2152,7 +2185,7 @@
     ctx.fillStyle = '#cfd6e2';
     ctx.font = '800 13px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(bs.phase === 2 ? '漫堤鱼 · 它在吸水' : (bs.phase >= 3 ? '漫堤鱼 · 它没力气了' : '漫堤鱼 · 暗河'),
+    ctx.fillText(bs.phase === 2 ? ('漫堤鱼 · 它在吸水' + (bs.wstate === 'warn' || bs.wstate === 'rise' ? ' · 打不动' : '')) : (bs.phase >= 3 ? '漫堤鱼 · 它没力气了' : '漫堤鱼 · 暗河'),
       CFG.LOGICAL_W * 0.5, byy - 8);
     ctx.font = '700 12px sans-serif';
     ctx.fillStyle = CFG.T_INFAMMO ? '#e8b23a' : '#8e97a8';
@@ -2289,9 +2322,10 @@
   }
 
   function drawHud() {
+    var ti = topInset();
     /* 心 */
     for (var i = 0; i < tierMaxHp(); i++) {
-      var hx = 26 + i * 40, hy = 38, aliveHeart = i < P.hp;
+      var hx = 26 + i * 40, hy = 38 + ti, aliveHeart = i < P.hp;
       ctx.lineWidth = 2.5;
       if (aliveHeart) {
         ctx.fillStyle = '#e0554f';
@@ -2310,16 +2344,16 @@
       ctx.fillStyle = '#e8b23a';
       ctx.font = '800 14px sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText('凝视 ' + ((P.gazeT * 10 | 0) / 10) + 's', 20, 86);
+      ctx.fillText('凝视 ' + ((P.gazeT * 10 | 0) / 10) + 's', 20, 86 + ti);
     }
     /* 层数：字号加大、离顶部留距离 */
     ctx.fillStyle = '#f2ead8';
     ctx.font = '800 34px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('第 ' + P.floor + ' / ' + CFG.TOTAL_FLOORS + ' 层', CFG.LOGICAL_W * 0.5, 62);
+    ctx.fillText('第 ' + P.floor + ' / ' + CFG.TOTAL_FLOORS + ' 层', CFG.LOGICAL_W * 0.5, 62 + ti);
     ctx.font = '600 14px sans-serif';
     ctx.fillStyle = 'rgba(242,234,216,0.55)';
-    ctx.fillText(bandOf(P.floor).name + ' · 井宽 ' + Math.round(shaftW(P.y)) + 'px', CFG.LOGICAL_W * 0.5, 84);
+    ctx.fillText(bandOf(P.floor).name + ' · 井宽 ' + Math.round(shaftW(P.y)) + 'px', CFG.LOGICAL_W * 0.5, 84 + ti);
     ctx.textAlign = 'left';
 
     /* 弹药：瓜子图标排一行，超过 20 颗降级为"图标 + 数字"（审阅漏洞 #9） */
@@ -2394,6 +2428,7 @@
       '血档 ' + gTier + (gTier === 1 ? ' 3血' : (gTier === 2 ? ' 2血' : ' 1血')),
       '实体 弹' + ents + ' 粒' + countLive(S.particles),
       '素材 ' + (IMG_TOTAL - IMG_WAIT) + '/' + IMG_TOTAL + ' 弃' + IMG_FAIL,
+      '顶距 env' + Math.round(gTopEnv) + '+条' + Math.round(gTopBar) + '→' + gTopLogical + '逻辑' + (gTopOverride >= 0 ? '(覆盖)' : ''),
       'vy ' + P.vy.toFixed(0) + ' vx ' + P.vx.toFixed(0),
       '摔伤线' + Math.round(hardLandLine()) + ' 上限' + Math.round(fallCapBase()) + ' 起' + firstLethalFloor() + '层',
       'x ' + P.x.toFixed(0) + ' 层' + P.floor + ' 最深' + P.deepest,
@@ -2639,8 +2674,6 @@
 
   function shareFallback() {
     if (!S.reportData || !hasShareDom) return;
-    elReportImg.src = S.reportData;
-    elReportImg.className = '';
     setShareStatus('长按图片可保存');
   }
 
@@ -2676,14 +2709,24 @@
     if (!S.over) return;
     try {
       S.reportData = buildReportCard();
-      var mt = window.xhs && window.xhs.miniTool;
-      if (mt && hasShareDom) {
-        elShareBtns.className = '';
-        setShareStatus('');
-      } else {
-        shareFallback();
-      }
-    } catch (e) { /* 战报失败不阻塞重开 */ }
+    } catch (e) { S.reportData = null; }
+    if (!hasShareDom) return;
+    /* 图就是结算主体：有桥没桥都要画出来（原来只有没桥时才画，App 里反而看不到图） */
+    if (S.reportData) {
+      elReportImg.src = S.reportData;
+      elReportImg.className = '';
+      elResText.className = 'hidden';
+    } else {
+      elReportImg.className = 'hidden';
+      elResText.className = '';          // 图没生成成功：退回文字卡，不给空白
+    }
+    var mt = window.xhs && window.xhs.miniTool;
+    if (mt) {
+      elShareBtns.className = '';
+      setShareStatus('');
+    } else {
+      setShareStatus('长按图片可保存');
+    }
   }
 
   function showResult() {
@@ -2705,16 +2748,11 @@
     elResMeta.textContent = meta;
     document.getElementById('result-card').className = S.win ? 'win' : '';   // 通关卡与死亡卡视觉分开
     setPauseChip(false);
-    elHint.textContent = gTier === 1
-      ? '简单档：能错三次，用来熟悉走位和缺口'
-      : (gTier === 2
-        ? '标准档：两下就没'
-        : '困难档：碰到就没——走位就是命');
-    syncTierBtns();
     if (hasShareDom) {
       elShareBtns.className = 'hidden';
       elReportImg.className = 'hidden';
       elShareStatus.textContent = '';
+      elResText.className = '';            // 图 60ms 后才生成好，先用文字兜住
     }
     elResult.className = '';
     setTimeout(buildShareAssets, 60);
@@ -2722,9 +2760,8 @@
 
   function syncTierBtns() {
     for (var i = 0; i < 3; i++) {
-      barBtns[i].className = 'xb' + (gTier === i + 1 ? ' on' : '');
-      resBtns[i].className = 'xb' + (gTier === i + 1 ? ' on' : '');
-      htBtns[i].className = 'ht' + (gTier === i + 1 ? ' on' : '');
+      if (barBtns[i]) barBtns[i].className = 'xb' + (gTier === i + 1 ? ' on' : '');
+      if (htBtns[i]) htBtns[i].className = 'ht' + (gTier === i + 1 ? ' on' : '');
     }
   }
 
@@ -2819,9 +2856,6 @@
   barBtns[0].addEventListener('click', function () { setTier(1); });
   barBtns[1].addEventListener('click', function () { setTier(2); });
   barBtns[2].addEventListener('click', function () { setTier(3); });
-  resBtns[0].addEventListener('click', function () { setTier(1); });
-  resBtns[1].addEventListener('click', function () { setTier(2); });
-  resBtns[2].addEventListener('click', function () { setTier(3); });
   document.getElementById('btn-restart').addEventListener('click', function () { newRun(); setPauseChip(true); });
   document.getElementById('btn-again').addEventListener('click', function () { newRun(); setPauseChip(true); });
   document.getElementById('btn-jump').addEventListener('click', function () { jumpFloors(10); });
@@ -2852,6 +2886,17 @@
   togBtns[2].addEventListener('click', function () { CFG.T_BIGFISH = !CFG.T_BIGFISH; syncToggleBtns(); });
   var elAmmoBtn = document.getElementById('btn-t-ammo');
   if (elAmmoBtn) elAmmoBtn.addEventListener('click', function () { CFG.T_INFAMMO = !CFG.T_INFAMMO; syncToggleBtns(); });
+  /* 顶距现场微调：上传包没有改 URL 的机会，只能靠这两颗钮当场推到不遮挡，
+     再看调试浮层的 env/条/逻辑 三个数报回来定默认值 */
+  var elTopMinus = document.getElementById('btn-top-minus');
+  var elTopPlus = document.getElementById('btn-top-plus');
+  function nudgeTop(d) {
+    if (gTopOverride < 0) gTopOverride = gTopLogical;
+    gTopOverride = Math.max(0, gTopOverride + d);
+    measureTopInset();
+  }
+  if (elTopMinus) elTopMinus.addEventListener('click', function () { nudgeTop(-10); });
+  if (elTopPlus) elTopPlus.addEventListener('click', function () { nudgeTop(10); });
   /* 调试条收起/展开：一整排按钮会挡住画面上沿，收起来只剩版本号 + 这颗钮 */
   var elBarMin = document.getElementById('btn-bar-min');
   if (elBarMin) elBarMin.addEventListener('click', function () {
@@ -2911,16 +2956,21 @@
     elPause.className = 'hidden';
     setPauseChip(true);
   });
-  document.getElementById('btn-menu').addEventListener('click', function () {
+  function goHome() {
     gPaused = false;
     elPause.className = 'hidden';
+    elResult.className = 'hidden';
     gAttract = true;
     newRun();            // 放弃的这一局不计成绩，重开只为让首页身后的井是干净的
     fillHome();
     syncTierBtns();
     elHome.className = '';
     setPauseChip(false);
-  });
+  }
+  var elBtnMenu = document.getElementById('btn-menu');
+  var elBtnHome = document.getElementById('btn-home');
+  if (elBtnMenu) elBtnMenu.addEventListener('click', goHome);
+  if (elBtnHome) elBtnHome.addEventListener('click', goHome);
   document.getElementById('btn-howto').addEventListener('click', function () { elHowto.className = ''; });
   document.getElementById('btn-howto-close').addEventListener('click', function () { elHowto.className = 'hidden'; });
 
@@ -3461,6 +3511,8 @@
 
   window.JIAO_FALL = {
     CFG: CFG,
+    top: function () { return { env: gTopEnv, bar: gTopBar, logical: gTopLogical, override: gTopOverride }; },
+    finish: function (cause) { if (!S.over) endRun(cause || '硬着陆'); },
     state: function () { return S; },
     player: function () { return P; },
     setTier: setTier,

@@ -11,6 +11,22 @@ html, body {
   -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
 }
 
+/* 安全区探针：零尺寸元素，只把 env(safe-area-inset-top) 的真实值交给 JS 量
+   （canvas 画不出 CSS 安全区，HUD 必须知道顶部被谁占了）。不可交互、不可见。 */
+#safe-probe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  padding: 0;
+  padding-top: 0;
+  padding-top: calc(0px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
+  border: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
 #proto-bar {
   position: absolute;
   top: 0;
@@ -97,21 +113,23 @@ html, body {
 
 #result.hidden { display: none; }
 
-/* 卡片高度会随战报图/分享按钮变化 ⇒ 一律交给 flex 居中，不再硬编码自身半高 */
+/* 结算卡＝两段式：上段战报图（含存相册/发笔记），下段菜单竖排 */
 #result-card {
   position: static;
   box-sizing: border-box;
-  width: 268px;
-  max-width: 100%;
+  width: 322px;
+  max-width: 94%;
   max-height: 100%;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   margin: auto;
-  padding: 18px 14px;
+  padding: 14px 12px 12px;
   border: 1px solid #3a4150;
   border-radius: 12px;
   background: #1a1d25;
 }
+
+#result-text.hidden { display: none; }
 
 #result-title { font-size: 14px; color: #a9b2c2; }
 
@@ -131,30 +149,20 @@ html, body {
   white-space: pre-line;
 }
 
-#result-xbtns { margin: 10px 0 8px; }
-
-#result button {
-  margin: 3px;
-  padding: 7px 11px;
-  border: 1px solid #3a4150;
-  border-radius: 6px;
-  background: #22262f;
-  color: #cfd6e2;
-  font-size: 13px;
-}
-
-#result button.on {
-  background: #e8b23a;
-  border-color: #e8b23a;
-  color: #231a05;
-  font-weight: 700;
+#result-menu {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  margin-top: 11px;
+  padding-top: 11px;
+  border-top: 1px solid #2b3038;
 }
 
 #btn-again {
   display: block;
   width: 100%;
-  margin: 4px 0 0;
-  padding: 11px 0;
+  margin: 0;
+  padding: 12px 0;
   border: 0;
   border-radius: 8px;
   background: #d9534f;
@@ -163,11 +171,21 @@ html, body {
   font-weight: 700;
 }
 
-#result-hint {
-  margin-top: 9px;
-  font-size: 11px;
-  color: #6d7688;
-  line-height: 1.5;
+#btn-home {
+  display: block;
+  width: 100%;
+  margin: 8px 0 0;
+  padding: 11px 0;
+  border: 1px solid #3a4150;
+  border-radius: 8px;
+  background: #22262f;
+  color: #cfd6e2;
+  font-size: 15px;
+}
+
+#result-card.win #btn-again {
+  background: #e8b23a;
+  color: #231a05;
 }
 
 #pick3 {
@@ -268,10 +286,12 @@ html, body {
 
 #report-img {
   display: block;
-  width: 150px;
-  margin: 8px auto 4px;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  margin: 0 0 6px;
   border: 1px solid #3a4150;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
 #report-img.hidden { display: none; }
